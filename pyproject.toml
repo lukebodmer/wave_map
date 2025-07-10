@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wave-simulator"
+version = "0.1.0"
+description = "Discontinuous Galerkin finite element method for wave simulation from scratch in Python"
+readme = "README.org"
+license = {text = "MIT"}
+authors = [
+    {name = "luke", email = ""}
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20.0",
+    "scipy>=1.7.0", 
+    "matplotlib>=3.5.0",
+    "gmsh>=4.8.0",
+    "pyvista>=0.35.0",
+    "panel>=1.0.0",
+    "sympy>=1.9.0",
+    "tomli>=2.0.0; python_version<'3.11'",
+    "toml>=0.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0.0",
+    "black>=22.0.0",
+]
+
+[project.scripts]
+run-wave-simulation = "run_simulation:main"
+run-wave-gui = "run_gui:main"
