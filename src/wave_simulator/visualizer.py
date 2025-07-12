@@ -14,12 +14,13 @@ class Visualizer:
         self.set_data(mesh_data, data)
 
         # initialize gmsh if needed
-        if not gmsh.isInitialized():
-            self.mesh["initialize_gmsh"]()
+
+        #if not gmsh.isInitialized():
+        #    self.mesh["initialize_gmsh"]()
 
         # Reason for element_offset- Gmsh counts lower order elements like points and lines
         # before counting tetrahedrons. This code calls the first tetraheron element '0'
-        self._element_offset, _ = gmsh.model.mesh.getElementsByType(4)
+        #self._element_offset, _ = gmsh.model.mesh.getElementsByType(4)
 
         # create grid
         if grid:
@@ -493,14 +494,14 @@ class Visualizer:
     
             # Create a new off-screen plotter
             self.plotter = pv.Plotter(off_screen=True)
-    
             self.plotter.clear()
             self.set_camera()
-            self._show_grid()
             self.add_inclusion_boundary()
             self.add_nodes_3d("p")
+            self._show_grid()
             self.plotter.screenshot(output_file)
             self.plotter.close()
+
         except Exception as e:
             print(f"Failed to save screenshot to {output_file}: {e}")
             raise
@@ -586,7 +587,7 @@ class Visualizer:
                 ax.set_title(f"{label} at (x={x:.3f}, y={y:.3f}, z={z:.3f})")
                 ax.set_ylabel(label)
                 ax.grid(True, alpha=0.3)
-                ax.set_xlim(0, self.t_final)  # set x-limits to full time
+                ax.set_xlim(0, self.t_final - self.dt)  # set x-limits to full time
                 plot_idx += 1
     
         axes[-1].set_xlabel("Time (s)")

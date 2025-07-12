@@ -16,7 +16,7 @@ box_size = 0.25
 inclusion_radius = 0.05
 
 [solver]
-number_of_timesteps = 26
+number_of_timesteps = 20
 polynomial_order = 2
 
 [receivers]
@@ -24,7 +24,7 @@ top_sensors = 15
 side_sensors = 10
 
 [output_intervals]
-image = 0
-data = 0
-points = 10
-energy = 0
+image = 1
+data = 5
+points = 1
+energy = 5

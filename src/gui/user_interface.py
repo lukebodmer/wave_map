@@ -4,6 +4,7 @@ import tomli
 import panel as pn
 import matplotlib.pyplot as plt
 import pyvista as pv
+import gmsh
 
 from pathlib import Path
 from wave_simulator.visualizer import Visualizer
@@ -11,11 +12,18 @@ from wave_simulator.visualizer import Visualizer
 pn.extension('vtk')
 
 class UserInterface:
-    def __init__(self, outputs_dir='./outputs'):
+    def __init__(self, outputs_dir='data/outputs'):
         self.outputs_dir = Path(outputs_dir)
-        self.sim_folders = self._get_sim_folders()
 
-        sim_options = [""] + self.sim_folders
+        self.sim_families = self._get_sim_families()
+        family_options = [""] + self.sim_families
+
+        self.selected_family = None
+        self.family_selector = pn.widgets.Select(name='Simulation Family', options=family_options, value="")
+        self.family_selector.param.watch(self._update_family, 'value')
+
+        self.sim_folders = []  # 👈 Initialize empty, will be set when family is selected
+        sim_options = [""]  # 👈 No folders yet
 
         self.selected_folder = None
         self.data_files = []
@@ -38,22 +46,16 @@ class UserInterface:
         self.content = pn.Row()
         self.panel = pn.Row(
             pn.Column(
-                pn.pane.HTML("<h2>Simulation Viewer</h2>"),
+                pn.pane.HTML("<h2 style='margin-top: 4px; margin-bottom: 0px;'>Simulation Viewer</h2>"),
+                self.family_selector,  # <- Add family selector here too!
                 self.sim_selector,
                 self.frame_selector,
                 self.refresh_button,
                 self.show_3d_button,
                 self.status_text,
-                pn.pane.HTML(
-                    "<h3 style='margin-bottom: 4px; margin-top: 12px;'>Simulation Parameters</h3>",
-                    height=20
-                ),
+                pn.pane.HTML("<h3 style='margin-bottom: 4px; margin-top: 12px;'>Simulation Parameters</h3>", height=20),
                 self.parameters_pane,
-                pn.pane.HTML(
-                    "<h3 style='margin-bottom: 4px; margin-top: 12px;'>Runtime</h3>",
-                    height=20
-                ),
-
+                pn.pane.HTML("<h3 style='margin-bottom: 4px; margin-top: 12px;'>Runtime</h3>", height=20),
                 self.runtime_pane,
             ),
             pn.Column(
@@ -61,11 +63,32 @@ class UserInterface:
             )
         )
 
-    def _get_sim_folders(self):
+    def _get_sim_families(self):
         return sorted([
             f.name for f in self.outputs_dir.iterdir()
             if f.is_dir()
         ])
+    
+    def _get_sim_folders(self, family_name):
+        family_path = self.outputs_dir / family_name
+        if not family_path.exists():
+            return []
+        return sorted([
+            f.name for f in family_path.iterdir()
+            if f.is_dir()
+        ])
+
+    def _update_family(self, event):
+        if not event.new:
+            self.sim_selector.options = [""]
+            self.sim_selector.value = ""
+            self.selected_family = None
+            return
+    
+        self.selected_family = event.new
+        folders = self._get_sim_folders(event.new)
+        self.sim_selector.options = [""] + folders
+        self.sim_selector.value = ""
 
     def _update_folder(self, event):
         if not event.new:
@@ -77,7 +100,12 @@ class UserInterface:
             self.refresh_button.disabled = True
             return
 
-        self.selected_folder = self.outputs_dir / event.new
+        if not self.selected_family:
+            self.status_text.object = "<span style='color:red'>⚠️ No simulation family selected.</span>"
+            return
+        
+        self.selected_folder = self.outputs_dir / self.selected_family / event.new
+
         data_dir = self.selected_folder / "data"
         self.data_files = sorted(data_dir.glob("*.pkl"))
 
@@ -150,6 +178,7 @@ class UserInterface:
             return
         try:
             self.visualizer.add_nodes_3d("p")
+            self.visualizer._show_grid()
             self.visualizer.add_inclusion_boundary()
             self.visualizer.add_sensors()
             self.visualizer.show()
@@ -177,6 +206,7 @@ class UserInterface:
                 return
 
             self.visualizer = Visualizer(mesh_data, data)
+            #breakpoint()
             tracked_fig = self.visualizer.plot_tracked_points()
             energy_fig = self.visualizer.plot_energy()
 

@@ -60,7 +60,7 @@ class Simulator:
         if self.save_energy_interval == 0:
             return  # Don't initialize anything
         self.num_readings = math.ceil(self.time_stepper.num_time_steps /
-                                      self.save_energy_interval) + 1
+                                      self.save_energy_interval)
         self.energy_data = np.zeros(self.num_readings)
         self.kinetic_data = np.zeros(self.num_readings)
         self.potential_data = np.zeros(self.num_readings)
@@ -68,7 +68,7 @@ class Simulator:
     def _get_sensor_information(self, pressure=None, x=None, y=None, z=None):
         # subtrack one because we don't want 0th reading
         self.num_readings = math.ceil(self.time_stepper.num_time_steps /
-                                      self.save_points_interval) - 1
+                                      self.save_points_interval)
         self.column_index = 0
         self.tracked_fields = {}
         if pressure:
@@ -101,12 +101,12 @@ class Simulator:
 
         if self.save_image_interval and t_step % self.save_image_interval == 0:
             self._save_image()
-        if self.save_data_interval and t_step % self.save_data_interval == 0:
-            self._save_data()
         if self.save_points_interval and t_step % self.save_points_interval == 0:
             self._evaluate_sensor_data()
         if self.save_energy_interval and t_step % self.save_energy_interval == 0:
             self._save_energy()
+        if self.save_data_interval and t_step % self.save_data_interval == 0:
+            self._save_data()
 
     def run(self):
         logger = getLogger("simlog")

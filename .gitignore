@@ -1,3 +1,7 @@
 .envrc
 .direnv/
 data/
+__pycache__/
+*~
+\#*\#
+*~
