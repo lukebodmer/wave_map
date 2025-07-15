@@ -125,7 +125,7 @@ class UserInterface:
                 options.append(label)
 
             self.frame_selector.options = options
-            self.frame_selector.value = options[0]
+            self.frame_selector.value = options[-1]
             self.refresh_button.disabled = False
 
         param_file = self.selected_folder / "parameters.toml"
@@ -207,7 +207,7 @@ class UserInterface:
 
             self.visualizer = Visualizer(mesh_data, data)
             #breakpoint()
-            tracked_fig = self.visualizer.plot_tracked_points()
+            tracked_fig = self.visualizer.plot_sensor_data_as_matrix()
             energy_fig = self.visualizer.plot_energy()
 
             runtime_sec = data.get("runtime", None)
@@ -236,7 +236,7 @@ class UserInterface:
             layout = pn.Row(
                 pn.Column(
                     pn.pane.HTML("<b>Sensors</b>"),
-                    pn.pane.Matplotlib(tracked_fig, tight=True, height=900, width=500),
+                    pn.pane.Matplotlib(tracked_fig, tight=True, height=700, width=700),
                 ),
                 pn.Column(
                     pn.pane.HTML("<b>Energy Plot</b>"),

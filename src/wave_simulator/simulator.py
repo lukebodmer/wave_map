@@ -59,8 +59,9 @@ class Simulator:
     def initialize_energy_array(self):
         if self.save_energy_interval == 0:
             return  # Don't initialize anything
+        # add one to evaulate energy at zero
         self.num_readings = math.ceil(self.time_stepper.num_time_steps /
-                                      self.save_energy_interval)
+                                      self.save_energy_interval) + 1
         self.energy_data = np.zeros(self.num_readings)
         self.kinetic_data = np.zeros(self.num_readings)
         self.potential_data = np.zeros(self.num_readings)
@@ -109,16 +110,18 @@ class Simulator:
             self._save_data()
 
     def run(self):
+        # log run information
         logger = getLogger("simlog")
         run_hash = str(self.output_path).rsplit('/', 1)[-1].split('_', 1)[0]
-
         logger.info(f"......... Running simulation {run_hash} .........")
 
+        # start run timer
         self.start_time = time.time()
 
-        # Save at timestep 0 (initial condition)
-        #self._save_scheduled_outputs()
+        # Save energy timestep 0 (initial condition)
+        self._save_energy()
 
+        # main loop
         while self.time_stepper.current_time_step < self.time_stepper.num_time_steps:
             self.time_stepper.advance_time_step()
             self._save_scheduled_outputs()
@@ -142,8 +145,8 @@ class Simulator:
         # Load mesh data
         mesh_data = data['mesh_directory'] / "mesh.pkl"
         if mesh_data.exists():
-            with open(mesh_data, 'rb') as mf:
-                mesh_data = pickle.load(mf)
+            with open(mesh_data, 'rb') as f:
+                mesh_data = pickle.load(f)
         else:
             raise Exception("Error: Pickled mesh data (mesh.pkl) doesn't exist.") 
         return mesh_data

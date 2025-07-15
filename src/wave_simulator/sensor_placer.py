@@ -5,94 +5,84 @@ import matplotlib.pyplot as plt
 class SensorPlacer:
     def __init__(self,
                  box_size=0.25,
-                 top_sensors=0,
-                 side_sensors=0,
+                 top_sensors=None,
+                 side_sensors=None,
+                 sensors_per_face=None,
                  random_seed=42,
-                 additional_sensors=None):
-        """
-        Initialize the SensorPlacer with cube dimensions and sensor counts.
-
-        Parameters:
-        - box_size (float): Side length of the cube (default: 0.25m).
-        - top_sensors (int): Number of sensors on the top face (default: 15)
-        - side_sensors (int): Number of sensors on the side face (default: 10).
-        """
+                 additional_sensors=None,
+                 source_center=(0.125, 0.125, 0.0),
+                 source_radius=0.02):
         self.box_size = box_size
         self.top_sensors = top_sensors
         self.side_sensors = side_sensors
+        self.sensors_per_face = sensors_per_face
         self.additional_sensors = additional_sensors if additional_sensors is not None else []
+        self.source_center = np.array(source_center)
+        self.source_radius = source_radius
         self.sensor_positions = []
-        np.random.seed(random_seed)  # Ensure reproducibility
+
+        if (sensors_per_face is not None) and (top_sensors is not None or side_sensors is not None):
+            raise ValueError("Specify either (top_sensors and side_sensors) OR sensors_per_face, not both.")
+        if (sensors_per_face is None) and (top_sensors is None or side_sensors is None):
+            raise ValueError("You must specify either (top_sensors and side_sensors) OR sensors_per_face.")
+
+        np.random.seed(random_seed)
 
     def latin_hypercube_2d(self, n_samples, x_min, x_max, y_min, y_max):
-        """
-        Generate 2D Latin Hypercube Samples within [x_min, x_max] × [y_min, y_max].
-
-        Parameters:
-        - n_samples (int): Number of samples.
-        - x_min, x_max (float): Range for x-coordinate.
-        - y_min, y_max (float): Range for y-coordinate.
-
-        Returns:
-        - np.ndarray: Array of shape (n_samples, 2) with sampled (x, y) points.
-        """
-        # Create strata
         x_strata = np.linspace(x_min, x_max, n_samples + 1)
         y_strata = np.linspace(y_min, y_max, n_samples + 1)
-
-        # Sample one point per stratum
         x = np.random.uniform(x_strata[:-1], x_strata[1:])
         y = np.random.uniform(y_strata[:-1], y_strata[1:])
-
-        # Shuffle to avoid correlation between x and y
         np.random.shuffle(x)
         np.random.shuffle(y)
-
         return np.column_stack((x, y))
 
-    def get_sensor_coordinates(self):
-        """
-        Place sensors on the top and side faces using LHS.
+    def get_sensor_grid(self, sensors_per_face, margin=0.05):
+        grid_n = int(np.sqrt(sensors_per_face))
+        if grid_n ** 2 != sensors_per_face:
+            raise ValueError("sensors_per_face must be a perfect square.")
 
-        Returns:
-        - list: List of sensor positions as [x, y, z] coordinates.
-        """
-        # top face (z = box_size)
-        top_samples = self.latin_hypercube_2d(
-            self.top_sensors, 0, self.box_size, 0, self.box_size
-        )
+        grid = np.linspace(margin, self.box_size - margin, grid_n)
+        gx, gy = np.meshgrid(grid, grid)
+        grid_points = np.column_stack((gx.ravel(), gy.ravel()))
+
+        # All 6 faces
+        top = np.column_stack((grid_points[:, 0], grid_points[:, 1], np.full(len(grid_points), self.box_size)))
+        bottom = np.column_stack((grid_points[:, 0], grid_points[:, 1], np.zeros(len(grid_points))))
+        xp = np.column_stack((np.full(len(grid_points), self.box_size), grid_points[:, 0], grid_points[:, 1]))
+        xn = np.column_stack((np.zeros(len(grid_points)), grid_points[:, 0], grid_points[:, 1]))
+        yp = np.column_stack((grid_points[:, 0], np.full(len(grid_points), self.box_size), grid_points[:, 1]))
+        yn = np.column_stack((grid_points[:, 0], np.zeros(len(grid_points)), grid_points[:, 1]))
+
+        return np.vstack((top, bottom, xp, xn, yp, yn))
+
+    def get_lhs_sensor_coordinates(self):
+        top_samples = self.latin_hypercube_2d(self.top_sensors, 0, self.box_size, 0, self.box_size)
         top_positions = np.column_stack((top_samples, np.full(self.top_sensors, self.box_size)))
-        # Top face (y = box_size): Add center sensor
-        top_center = np.array([[self.box_size / 2, self.box_size/2, self.box_size]])
-
-
-        # Side face (x = box_size)
-        side_samples = self.latin_hypercube_2d(
-            self.side_sensors, 0, self.box_size, 0, self.box_size
-        )
+        top_center = np.array([[self.box_size / 2, self.box_size / 2, self.box_size]])
+        side_samples = self.latin_hypercube_2d(self.side_sensors, 0, self.box_size, 0, self.box_size)
         side_positions = np.column_stack((np.full(self.side_sensors, self.box_size), side_samples))
+        return np.vstack((top_positions, top_center, side_positions))
 
-        # Combine base sensors
-        base_sensors = np.vstack((top_positions, side_positions, top_center))
+    def _filter_near_source(self, sensors):
+        """
+        Removes sensors within 2 * source_radius of the source center.
+        """
+        distances = np.linalg.norm(sensors - self.source_center, axis=1)
+        mask = distances >= 2 * self.source_radius
+        return sensors[mask]
 
-        # Add additional sensors only if the list is not empty
-        if len(self.additional_sensors) > 0:
-            self.sensor_positions = np.vstack((base_sensors, np.array(self.additional_sensors)))
+    def get_sensor_coordinates(self):
+        if self.sensors_per_face is not None:
+            base_sensors = self.get_sensor_grid(self.sensors_per_face)
         else:
-            self.sensor_positions = base_sensors
+            base_sensors = self.get_lhs_sensor_coordinates()
 
-        return [list(pos) for pos in self.sensor_positions]
+        if len(self.additional_sensors) > 0:
+            base_sensors = np.vstack((base_sensors, np.array(self.additional_sensors)))
 
+        # Remove sensors near source
+        filtered_sensors = self._filter_near_source(base_sensors)
 
-# Example usage
-if __name__ == "__main__":
-    # Initialize with default values (0.25m box, 15 top sensors, 10 side sensors)
-    placer = SensorPlacer(box_size=0.25, top_sensors=15, side_sensors=10)
-
-    # Place sensors and get coordinates
-    sensor_coords = placer.place_sensors()
-
-    # Print sensor positions
-    print("Sensor positions (x, y, z):")
-    for i, pos in enumerate(sensor_coords):
-        print(f"Sensor {i+1}: {pos}")
+        self.sensor_positions = filtered_sensors
+        return [list(pos) for pos in filtered_sensors]

@@ -67,6 +67,7 @@ class SimulationSetup:
             source_amplitude=cfg.source.amplitude,
             source_frequency=cfg.source.frequency,
             inclusion_radius=cfg.mesh.inclusion_radius,
+            inclusion_center=cfg.mesh.inclusion_center,
             msh_file=self.get_mesh_directory() / "mesh.msh",
         )
 
@@ -91,8 +92,15 @@ class SimulationSetup:
             'reference_element': mesh.reference_element,
             'initialize_gmsh': mesh.initialize_gmsh,
             'speed_per_cell': mesh.speed[0, :],  # First row only
-            'density_per_cell': mesh.density[0, :]  # First row only
-        }
+            'density_per_cell': mesh.density[0, :],  # First row only
+            'interior_face_node_indices': mesh.interior_face_node_indices,
+            'boundary_node_indices': mesh.boundary_node_indices,
+            'boundary_face_node_indices': mesh.boundary_face_node_indices,
+            'cell_jacobians': mesh.jacobians[0, :],
+            'num_cells': mesh.num_cells,
+            'inclusion_center': mesh.inclusion_center,
+            'inclusion_radius': mesh.inclusion_radius,
+            }
         return mesh_data
 
     def save_mesh_visualization_data(self, mesh):
@@ -113,6 +121,7 @@ class SimulationSetup:
             "grid_size": self.cfg.mesh.grid_size,
             "box_size": self.cfg.mesh.box_size,
             "inclusion_radius": self.cfg.mesh.inclusion_radius,
+            "inclusion_center": self.cfg.mesh.inclusion_center,
             "source_center": self.cfg.source.center,
             "source_radius": self.cfg.source.radius,
             "polynomial_order": self.cfg.solver.polynomial_order,
@@ -177,7 +186,11 @@ class SimulationSetup:
         sensor_placer = SensorPlacer(box_size=cfg.mesh.box_size,
                                      top_sensors=cfg.receivers.top_sensors,
                                      side_sensors=cfg.receivers.side_sensors,
-                                     additional_sensors=cfg.receivers.pressure)
+                                     sensors_per_face=cfg.receivers.sensors_per_face,
+                                     additional_sensors=cfg.receivers.additional_sensors,
+                                     source_center=cfg.source.center,
+                                     source_radius=cfg.source.radius,
+                                     )
 
         sensor_coordinates = sensor_placer.get_sensor_coordinates()
 

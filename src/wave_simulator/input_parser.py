@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -25,21 +25,22 @@ class MeshConfig:
     grid_size: float = 0.008
     box_size: float = 0.25
     inclusion_radius: float = 0.05
+    inclusion_center: List[float] = field(default_factory=lambda: [0.125, 0.125, 0.125])
 
 
 @dataclass
 class SolverConfig:
-    total_time: float = None
-    number_of_timesteps: int = None
+    total_time: Optional[float] = None
+    number_of_timesteps: Optional[int] = None
     polynomial_order: int = 3
 
     def __post_init__(self):
-        try:  
+        try:
             if (self.total_time is None) == (self.number_of_timesteps is None):
                 raise ValueError("You must specify exactly one of 'total_time' or 'number_of_timesteps'.")
         except ValueError as e:
             print(f"Error in parameters.toml file: {e}")
-            sys.exit(1)  # or handle however you like
+            sys.exit(1)
 
 
 @dataclass
@@ -48,8 +49,21 @@ class ReceiversConfig:
     x_velocity: List[List[float]] = field(default_factory=list)
     y_velocity: List[List[float]] = field(default_factory=list)
     z_velocity: List[List[float]] = field(default_factory=list)
-    top_sensors: int = 15
-    side_sensors: int = 10
+    top_sensors: Optional[int] = None
+    side_sensors: Optional[int] = None
+    sensors_per_face: Optional[int] = None
+    additional_sensors: List[List[float]] = field(default_factory=list)
+
+    def __post_init__(self):
+        using_top_side = self.top_sensors is not None or self.side_sensors is not None
+        using_sensors_per_face = self.sensors_per_face is not None
+
+        if using_top_side and using_sensors_per_face:
+            print("Error in parameters.toml file: Specify either 'top_sensors' and 'side_sensors' OR 'sensors_per_face', not both.")
+            sys.exit(1)
+        if not using_top_side and not using_sensors_per_face:
+            print("Error in parameters.toml file: You must specify either 'top_sensors' and 'side_sensors' OR 'sensors_per_face'.")
+            sys.exit(1)
 
 
 @dataclass

@@ -19,11 +19,12 @@ class Mesh3d:
                  source_amplitude=None,
                  source_frequency=None,
                  inclusion_radius=None,
+                 inclusion_center=None,
                  msh_file=None):
         if None not in (grid_size, box_size, inclusion_density, inclusion_speed,
                         outer_density, outer_speed, source_center,
                         source_radius, source_amplitude, source_frequency,
-                        inclusion_radius, msh_file):
+                        inclusion_radius, inclusion_center, msh_file):
             self.reference_element = finite_element
             self.reference_element_operators = ReferenceElementOperators(self.reference_element)
             self.dim = self.reference_element.d
@@ -39,6 +40,7 @@ class Mesh3d:
             self.source_amplitude = source_amplitude
             self.source_frequency = source_amplitude
             self.inclusion_radius = inclusion_radius
+            self.inclusion_center= inclusion_center
             self.msh_file = msh_file
         else:
             raise ValueError("Invalid Mesh3d initialization: must provide all geometric parameters.")
@@ -121,7 +123,8 @@ class Mesh3d:
         source_radius = self.source_radius
     
         # Inclusion geometry
-        inclusion_center = (x_dim / 2, y_dim / 2, z_dim / 2)
+        #inclusion_center = (x_dim / 2, y_dim / 2, z_dim / 2)
+        inclusion_center = self.inclusion_center
         inclusion_radius = self.inclusion_radius
         
         main_cell_size = self.grid_size
