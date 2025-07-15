@@ -225,8 +225,8 @@ class Visualizer:
         # Add the points to the plot as red spheres
         self.plotter.add_points(
             sensor_points,
-            color="red",
-            point_size=24,
+            color="black",
+            point_size=14,
             render_points_as_spheres=True
         )
 

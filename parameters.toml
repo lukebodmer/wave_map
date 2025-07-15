@@ -13,7 +13,7 @@ outer_wave_speed = 1.0
 [mesh]
 grid_size = 0.01
 box_size = 0.25
-inclusion_radius = 0.06
+inclusion_radius = 0.04
 inclusion_center = [0.12, 0.08, 0.08]
 
 [solver]
@@ -32,7 +32,7 @@ sensors_per_face = 9
 #		      [0.125, 0.00, 0.125]]
 
 [output_intervals]
-image = 1
-data = 10
+image = 10
+data = 200
 points = 10
-energy = 1
+energy = 200
