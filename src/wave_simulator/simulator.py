@@ -119,7 +119,8 @@ class Simulator:
         self.start_time = time.time()
 
         # Save energy timestep 0 (initial condition)
-        self._save_energy()
+        if self.save_energy_interval > 0:
+            self._save_energy()
 
         # main loop
         while self.time_stepper.current_time_step < self.time_stepper.num_time_steps:

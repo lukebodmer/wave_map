@@ -130,15 +130,8 @@ class SimulationSetup:
         return hashlib.sha1(encoded).hexdigest()[:10]
 
     def _resolve_output_path(self):
-        cfg = self.cfg
-        name = (
-            f"a{cfg.source.amplitude}_f{cfg.source.frequency}"
-            f"_h{cfg.mesh.grid_size}_d{cfg.material.inclusion_density}"
-            f"_c{cfg.material.inclusion_wave_speed}"
-        )
-        path = self.base_output_dir / name
-        hash_suffix = self._hash_config()
-        path = path.with_name(f"{hash_suffix}_{name}")
+        config_hash = self._hash_config()
+        path = self.base_output_dir / config_hash
         # leave program if the simulation has already been run
         if path.exists():
             print(f"Simulation already exists at {path}. Exiting simulation.")

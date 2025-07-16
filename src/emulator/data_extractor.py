@@ -7,46 +7,65 @@ from pathlib import Path
 class DataExtractor:
     """Extracts parameters and final pressure data from simulation output folders."""
 
-    def __init__(self,
-                 run_family_name="default_family"):
-        self.base_output_dir = Path(f"data/outputs/{run_family_name}")
-        self.base_dir = Path(base_dir)
+    def __init__(self, run_family_name="default_family", test_hashes_file=None):
+        self.base_dir = Path(f"data/outputs/{run_family_name}")
+        self.test_hashes = set()
+    
+        if test_hashes_file and Path(test_hashes_file).exists():
+            with open(test_hashes_file, "r") as f:
+                self.test_hashes = {line.strip() for line in f if line.strip()}
 
     def extract(self):
         param_list = []
         pressure_list = []
-
+        X_train, Y_train = [], []
+        X_test, Y_test = [], []
+        
         for folder in sorted(self.base_dir.iterdir()):
             if not folder.is_dir():
                 continue
-
+        
+            hash_id = folder.name
             toml_file = folder / "parameters.toml"
-            pkl_file = folder / "data" / "final_sensor_data.pkl"
-
+            pkl_file = folder /  "final_sensor_data.pkl"
+        
             if not toml_file.exists() or not pkl_file.exists():
                 continue
-
+        
             params = self._extract_parameters(toml_file)
             pressure_data = self._load_numpy_array(pkl_file)
-
+        
             if params is not None and pressure_data is not None:
-                param_list.append(params)
-                pressure_list.append(pressure_data)
+                if hash_id in self.test_hashes:
+                    X_test.append(params)
+                    Y_test.append(pressure_data)
+                else:
+                    X_train.append(params)
+                    Y_train.append(pressure_data)
+        
+        X_train, Y_train = np.array(X_train), np.array(Y_train)
+        X_test, Y_test = np.array(X_test), np.array(Y_test)
+        
+        return X_train, Y_train, X_test, Y_test
 
-        X = np.array(param_list)  # shape: (n_simulations, 2)
-        Y = np.array(pressure_list)  # shape: (n_simulations, n_sensors, n_readings)
-        return X, Y
 
     def _extract_parameters(self, toml_file):
-        """Extracts inclusion_density and inclusion_wave_speed from a TOML file."""
+        """Extracts [density, wave_speed, cx, cy, cz, radius] from a TOML file."""
         try:
             with open(toml_file, "rb") as f:
                 toml_data = tomli.load(f)
             material = toml_data.get("material", {})
-            return [
-                material.get("inclusion_density"),
-                material.get("inclusion_wave_speed")
-            ]
+            mesh = toml_data.get("mesh", {})
+    
+            density = material.get("inclusion_density")
+            speed = material.get("inclusion_wave_speed")
+            center = mesh.get("inclusion_center", [None, None, None])
+            radius = mesh.get("inclusion_radius")
+    
+            if None in (density, speed, radius) or any(c is None for c in center):
+                raise ValueError("Missing parameter(s)")
+    
+            return [density, speed, *center, radius]
         except Exception as e:
             print(f"Error reading parameters from {toml_file}: {e}")
             return None

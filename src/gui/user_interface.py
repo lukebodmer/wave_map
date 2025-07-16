@@ -206,9 +206,20 @@ class UserInterface:
                 return
 
             self.visualizer = Visualizer(mesh_data, data)
-            #breakpoint()
             tracked_fig = self.visualizer.plot_sensor_data_as_matrix()
-            energy_fig = self.visualizer.plot_energy()
+
+            if data['save_energy_interval'] > 0:
+                energy_fig = self.visualizer.plot_energy()
+                energy_column = pn.Column(
+                    pn.pane.HTML("<b>Energy Plot</b>"),
+                    pn.pane.Matplotlib(energy_fig, tight=True, width=550),
+                )
+            else:
+                print("no energy plot available")
+                energy_column = pn.Column(
+                    pn.pane.HTML("<b>Energy Plot</b>"),
+                    pn.pane.HTML("<b>⚠️ No energy plot available.</b>"),
+                )
 
             runtime_sec = data.get("runtime", None)
             if runtime_sec is not None:
@@ -239,12 +250,12 @@ class UserInterface:
                     pn.pane.Matplotlib(tracked_fig, tight=True, height=700, width=700),
                 ),
                 pn.Column(
-                    pn.pane.HTML("<b>Energy Plot</b>"),
-                    pn.pane.Matplotlib(energy_fig, tight=True, width=550),
+                    energy_column,
                     pn.pane.HTML("<b>Snapshot</b>"),
                     image_pane,
                 )
             )
+
             self.content.objects = [layout]
             self.status_text.object = f"<span style='color:green'>✅ Loaded frame: {data_path.name}</span>"
         except Exception as e:

@@ -3,6 +3,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from wave_simulator.simulation_setup import SimulationSetup
+
 #from wave_simulator.parameter_space_sampler import ParameterSpaceSampler 
 import cProfile
 

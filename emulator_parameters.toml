@@ -1,0 +1,14 @@
+[general]
+run_family_name = "single_moving_sphere"
+number_initial_parameter_files_to_create = 100
+base_config_path = "parameters.toml"
+
+[inclusion]
+inclusion_wave_speed_range = [0.5, 2.0]
+inclusion_density_range = [0.5, 2.0]
+inclusion_radius_range = [0.03, 0.07]
+allow_inclusion_to_move = true
+
+[geometry]
+boundary_buffer = 0.02
+

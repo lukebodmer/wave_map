@@ -37,6 +37,7 @@
 		python-pkgs.pyvista
                 python-pkgs.scipy
 		python-pkgs.tomli
+		python-pkgs.toml
               ]))
             ];
 

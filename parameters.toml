@@ -24,15 +24,9 @@ polynomial_order = 2
 #top_sensors = 15
 #side_sensors = 10
 sensors_per_face = 9
-#additional_sensors = [[0.125, 0.125, 0.25],
-#		      [0.125, 0.125, 0.00],
-#		      [0.25, 0.125, 0.125],
-#		      [0.00, 0.125, 0.125],
-#		      [0.125, 0.25, 0.125],
-#		      [0.125, 0.00, 0.125]]
 
 [output_intervals]
-image = 10
-data = 200
+image = 3000
+data = 3000
 points = 10
-energy = 200
+energy = 0
