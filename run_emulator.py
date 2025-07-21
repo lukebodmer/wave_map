@@ -6,11 +6,7 @@ from emulator.parameter_file_generator import ParameterFileGenerator
 from emulator.emulation_setup import EmulationSetup 
 
 def main(parameter_file):
-    
-    setup = EmulationSetup(config_path=parameter_file)
-
-    # Optional: Save
-    emulator = setup.build_emulator()
+    emulator = EmulationSetup(config_path=parameter_file)
     emulator.run()
 
 if __name__ == "__main__":

@@ -140,7 +140,7 @@ class EmulationSetup:
         self.logger.info("Saved train/test datasets: X_train.npy, Y_train.npy, X_test.npy, Y_test.npy.")
 
     def run(self):
-       if not self.unsimulated_hashes:
+        if not self.unsimulated_hashes:
             self.logger.info("No simulations to run.")
             return
 

@@ -1,27 +1,5 @@
-#+TITLE: Discontinuous Galerkin finite element method from scratch in python
-#+SUBTITLE: Making sense out of every step in the process
+#+TITLE: Wave Map
+#+SUBTITLE: A full waveform inversion method using a discontinuous galerkin simulation and a Partial Parallel Gaussian Process emulator.
 * Introduction
-This repository contains the code developed in [[https://govango.org/blogs/discontinuous-galerkin-method-from-scratch-in-python-the-finite-element][series of posts on the website.]]
-
-* Style Guide
-** Functions
-~snake_case~ for all functions
-** Classes
-~CamelCase~ with a starting capital letter for classes and class instances
-** Internal functions in a Class
-~_underscore_prefix_snake~ for each function in a Class that is only used internally in the class.
-** Variables / Parameters
-~snake_case~ for all variables and parameters.
-** Constants
-~ALL_CAPS_SNAKE~ for all constants
-** Comments
-*** single line and inline comments
-#+BEGIN_SRC python
-# start with a lowercase letter
-#+END_SRC
-
-*** docstring comments
-#+BEGIN_SRC python
-""" uses three quotes """
-#+END_SRC
+Coming Soon
 
