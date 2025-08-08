@@ -17,26 +17,36 @@ class GeneralConfig:
         if not isinstance(self.number_initial_parameter_files_to_create, int) or self.number_initial_parameter_files_to_create < 0:
             raise ValueError("number_initial_parameter_files_to_create must be a non-negative integer.")
 
-
 @dataclass
 class InclusionConfig:
     inclusion_wave_speed_range: List[float]
     inclusion_density_range: List[float]
-    inclusion_radius_range: List[float]
+    inclusion_scaling_range: List[List[float]]
+    allow_inclusion_to_rotate: bool = False
     allow_inclusion_to_move: bool = False
 
     def __post_init__(self):
         for name, rng in [
             ("inclusion_wave_speed_range", self.inclusion_wave_speed_range),
             ("inclusion_density_range", self.inclusion_density_range),
-            ("inclusion_radius_range", self.inclusion_radius_range),
         ]:
             if not (isinstance(rng, list) and len(rng) == 2 and all(isinstance(v, (int, float)) for v in rng)):
                 raise ValueError(f"{name} must be a list of two numbers.")
-            if any(v < 0 for v in rng):
-                raise ValueError(f"{name} values must be non-negative.")
+
+        for name, nested_rng in [
+            ("inclusion_scaling_range", self.inclusion_scaling_range),
+        ]:
+            if not (isinstance(nested_rng, list) and len(nested_rng) == 3):
+                raise ValueError(f"{name} must have three sublists (for x/y/z axes).")
+            for subrange in nested_rng:
+                if not (isinstance(subrange, list) and len(subrange) == 2):
+                    raise ValueError(f"Each sublist in {name} must contain two numbers.")
+
         if not isinstance(self.allow_inclusion_to_move, bool):
             raise TypeError("allow_inclusion_to_move must be a boolean.")
+        if not isinstance(self.allow_inclusion_to_rotate, bool):
+            raise TypeError("allow_inclusion_to_rotate must be a boolean.")
+
 
 
 @dataclass

@@ -56,19 +56,18 @@ class SimulationSetup:
 
         mesh = Mesh3d(
             finite_element=finite_element,
+            msh_file=self.get_mesh_directory() / "mesh.msh",
             grid_size=cfg.mesh.grid_size,
             box_size=cfg.mesh.box_size,
-            inclusion_density=cfg.material.inclusion_density,
-            inclusion_speed=cfg.material.inclusion_wave_speed,
-            outer_density=cfg.material.outer_density,
-            outer_speed=cfg.material.outer_wave_speed,
             source_center=cfg.source.center,
             source_radius=cfg.source.radius,
-            source_amplitude=cfg.source.amplitude,
-            source_frequency=cfg.source.frequency,
-            inclusion_radius=cfg.mesh.inclusion_radius,
+            outer_density=cfg.material.outer_density,
+            outer_speed=cfg.material.outer_wave_speed,
+            inclusion_density=cfg.material.inclusion_density,
+            inclusion_speed=cfg.material.inclusion_wave_speed,
             inclusion_center=cfg.mesh.inclusion_center,
-            msh_file=self.get_mesh_directory() / "mesh.msh",
+            inclusion_scaling=cfg.mesh.inclusion_scaling,
+            inclusion_rotation=cfg.mesh.inclusion_rotation,
         )
 
         # save mesh data needed for visualization
@@ -99,7 +98,8 @@ class SimulationSetup:
             'cell_jacobians': mesh.jacobians[0, :],
             'num_cells': mesh.num_cells,
             'inclusion_center': mesh.inclusion_center,
-            'inclusion_radius': mesh.inclusion_radius,
+            'inclusion_scaling': mesh.inclusion_scaling,
+            'inclusion_rotation': mesh.inclusion_rotation,
             }
         return mesh_data
 
@@ -120,10 +120,11 @@ class SimulationSetup:
         params = {
             "grid_size": self.cfg.mesh.grid_size,
             "box_size": self.cfg.mesh.box_size,
-            "inclusion_radius": self.cfg.mesh.inclusion_radius,
-            "inclusion_center": self.cfg.mesh.inclusion_center,
             "source_center": self.cfg.source.center,
             "source_radius": self.cfg.source.radius,
+            "inclusion_center": self.cfg.mesh.inclusion_center,
+            "inclusion_scaling": self.cfg.mesh.inclusion_scaling,
+            "inclusion_rotation": self.cfg.mesh.inclusion_rotation,
             "polynomial_order": self.cfg.solver.polynomial_order,
         }
         encoded = json.dumps(params, sort_keys=True).encode()

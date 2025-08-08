@@ -20,6 +20,7 @@ class SensorPlacer:
         self.source_center = np.array(source_center)
         self.source_radius = source_radius
         self.sensor_positions = []
+        self.margin = 0.2
 
         if (sensors_per_face is not None) and (top_sensors is not None or side_sensors is not None):
             raise ValueError("Specify either (top_sensors and side_sensors) OR sensors_per_face, not both.")
@@ -37,12 +38,12 @@ class SensorPlacer:
         np.random.shuffle(y)
         return np.column_stack((x, y))
 
-    def get_sensor_grid(self, sensors_per_face, margin=0.05):
+    def get_sensor_grid(self, sensors_per_face):
         grid_n = int(np.sqrt(sensors_per_face))
         if grid_n ** 2 != sensors_per_face:
             raise ValueError("sensors_per_face must be a perfect square.")
 
-        grid = np.linspace(margin, self.box_size - margin, grid_n)
+        grid = np.linspace(self.margin, self.box_size - self.margin, grid_n)
         gx, gy = np.meshgrid(grid, grid)
         grid_points = np.column_stack((gx.ravel(), gy.ravel()))
 

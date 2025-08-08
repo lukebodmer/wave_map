@@ -44,7 +44,8 @@ class Visualizer:
         self.boundary_node_indices = self.mesh["boundary_node_indices"]
         self.jacobians = self.mesh["cell_jacobians"]
         self.inclusion_center = self.mesh["inclusion_center"]
-        self.inclusion_radius = self.mesh["inclusion_radius"]
+        self.inclusion_scaling = self.mesh["inclusion_scaling"]
+        self.inclusion_rotation = self.mesh["inclusion_rotation"]
         self.vertex_coordinates = self.mesh["vertex_coordinates"]
         self.cell_to_vertices = self.mesh["cell_to_vertices"]
         self.face_node_indices = self.mesh["reference_element"].face_node_indices
@@ -91,7 +92,7 @@ class Visualizer:
         self.plotter.camera_position = camera_position
 
     def _show_grid(self):
-        self.plotter.show_grid()
+        self.plotter.show_grid(fmt="%.2f")
 
     def add_nodes_3d(self, field):
         """Plot nodes on the mesh with colors and opacity based on solution values."""
@@ -466,15 +467,57 @@ class Visualizer:
         plotter.show(title=f"Lagrange Element Nodes (d={d}, n={n})")
 
     def add_inclusion_boundary(self):
-
-        # Add the spherical inclusion
-        sphere_center = self.inclusion_center
-        sphere_radius = self.inclusion_radius
-        sphere = pv.Sphere(center=sphere_center,
-                           radius=sphere_radius,
-                           theta_resolution=10,
-                           phi_resolution=10)
-        self.plotter.add_mesh(sphere,
+        center = self.inclusion_center
+        scaling = self.inclusion_scaling
+        rotation = self.inclusion_rotation
+    
+        # Step 1: Create a unit sphere centered at origin
+        sphere = pv.Sphere(radius=1.0,
+                           center=(0, 0, 0),
+                           theta_resolution=30,
+                           phi_resolution=30)
+    
+        # Step 2: Build the rotation matrix from axis-angle
+        angle = np.linalg.norm(rotation)
+        if angle == 0:
+            R = np.eye(3)
+        else:
+            u = rotation / angle
+            ux, uy, uz = u
+            cos_theta = np.cos(angle)
+            sin_theta = np.sin(angle)
+            one_minus_cos = 1 - cos_theta
+    
+            R = np.array([
+                [cos_theta + ux**2 * one_minus_cos,
+                 ux * uy * one_minus_cos - uz * sin_theta,
+                 ux * uz * one_minus_cos + uy * sin_theta],
+                [uy * ux * one_minus_cos + uz * sin_theta,
+                 cos_theta + uy**2 * one_minus_cos,
+                 uy * uz * one_minus_cos - ux * sin_theta],
+                [uz * ux * one_minus_cos - uy * sin_theta,
+                 uz * uy * one_minus_cos + ux * sin_theta,
+                 cos_theta + uz**2 * one_minus_cos]
+            ])
+    
+        # Step 3: Combine scaling and rotation: A = R @ S
+        S = np.diag(scaling)
+        A = R @ S
+    
+        # Step 4: Build full 4x4 homogeneous transformation matrix
+        transform_matrix = np.eye(4)
+        transform_matrix[:3, :3] = A        # linear part
+        transform_matrix[:3, 3] = center    # translation
+    
+        # Step 5: Create a PyVista Transform object
+        transform = pv.Transform()
+        transform.matrix = transform_matrix
+    
+        # Step 6: Apply the transform
+        transformed_sphere = sphere.transform(transform, inplace=False)
+    
+        # Step 7: Add to plotter
+        self.plotter.add_mesh(transformed_sphere,
                               color="#ccdee6",
                               opacity=0.1,
                               show_edges=True)

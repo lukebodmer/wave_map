@@ -1,23 +1,24 @@
 [source]
-center = [0.125, 0.125, 0.0]
-radius = 0.02
+center = [0.5, 0.5, 0.0]
+radius = 0.10
 amplitude = 0.1
-frequency = 30
+frequency = 10
 
 [material]
-inclusion_density = 1.5
-inclusion_wave_speed = 0.5
+inclusion_density = 2.0
+inclusion_wave_speed = 2.0
 outer_density = 1.0
 outer_wave_speed = 1.0
 
 [mesh]
-grid_size = 0.01
-box_size = 0.25
-inclusion_radius = 0.04
-inclusion_center = [0.12, 0.08, 0.08]
+grid_size = 0.03
+box_size = 1.00
+inclusion_center = [0.5, 0.5, 0.5]
+inclusion_scaling = [0.22, 0.18, 0.18]
+inclusion_rotation = [0.12, 0.08, 0.08]
 
 [solver]
-number_of_timesteps = 3000
+number_of_timesteps = 4000
 polynomial_order = 2
 
 [receivers]
@@ -26,7 +27,7 @@ polynomial_order = 2
 sensors_per_face = 9
 
 [output_intervals]
-image = 3000
-data = 3000
+image = 4000
+data = 4000
 points = 10
 energy = 0

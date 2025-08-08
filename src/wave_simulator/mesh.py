@@ -3,45 +3,55 @@ import gmsh
 from logging import getLogger
 from wave_simulator.reference_element_operators import ReferenceElementOperators
 from wave_simulator.finite_elements import LagrangeElement
+from wave_simulator.geometry_generator import GeometryGenerator
 
 
 class Mesh3d:
     def __init__(self,
                  finite_element: LagrangeElement,
+                 msh_file=None,
                  grid_size=None,
                  box_size=None,
-                 inclusion_density=None,
-                 inclusion_speed=None,
-                 outer_density=None,
-                 outer_speed=None,
                  source_center=None,
                  source_radius=None,
-                 source_amplitude=None,
-                 source_frequency=None,
-                 inclusion_radius=None,
+                 outer_density=None,
+                 outer_speed=None,
+                 inclusion_density=None,
+                 inclusion_speed=None,
                  inclusion_center=None,
-                 msh_file=None):
-        if None not in (grid_size, box_size, inclusion_density, inclusion_speed,
-                        outer_density, outer_speed, source_center,
-                        source_radius, source_amplitude, source_frequency,
-                        inclusion_radius, inclusion_center, msh_file):
+                 inclusion_scaling=None,
+                 inclusion_rotation=None
+                 ):
+        if None not in (msh_file,
+                        grid_size,
+                        box_size,
+                        source_center,
+                        source_radius,
+                        outer_density,
+                        outer_speed,
+                        inclusion_density,
+                        inclusion_speed,
+                        inclusion_center,
+                        inclusion_scaling,
+                        inclusion_rotation,
+                        ):
             self.reference_element = finite_element
             self.reference_element_operators = ReferenceElementOperators(self.reference_element)
             self.dim = self.reference_element.d
             self.n = self.reference_element.n  # polynomial order
+
+            self.msh_file = msh_file
             self.grid_size = grid_size
             self.box_size = box_size
-            self.inclusion_density = inclusion_density
-            self.inclusion_speed = inclusion_speed
-            self.outer_density = outer_density
-            self.outer_speed = outer_speed
             self.source_center = source_center
             self.source_radius = source_radius
-            self.source_amplitude = source_amplitude
-            self.source_frequency = source_amplitude
-            self.inclusion_radius = inclusion_radius
+            self.outer_density = outer_density
+            self.outer_speed = outer_speed
+            self.inclusion_density = inclusion_density
+            self.inclusion_speed = inclusion_speed
             self.inclusion_center= inclusion_center
-            self.msh_file = msh_file
+            self.inclusion_scaling= inclusion_scaling
+            self.inclusion_rotation= inclusion_rotation
         else:
             raise ValueError("Invalid Mesh3d initialization: must provide all geometric parameters.")
 
@@ -105,72 +115,89 @@ class Mesh3d:
         logger = getLogger("simlog")
         logger.info("... Mesh not found. Generating new mesh ...")
 
-        gmsh.initialize()
-        gmsh.option.setNumber("General.Terminal", 0);
-        gmsh.clear()
-
-        # Some abbreviations
-        model = gmsh.model
-        mesh = model.mesh
- 
-        # Extract geometry parameters
-        x_dim = self.box_size
-        y_dim = self.box_size
-        z_dim = self.box_size
-    
-        # Source geometry
-        source_x, source_y, source_z = self.source_center
-        source_radius = self.source_radius
-    
-        # Inclusion geometry
-        #inclusion_center = (x_dim / 2, y_dim / 2, z_dim / 2)
-        inclusion_center = self.inclusion_center
-        inclusion_radius = self.inclusion_radius
-        
-        main_cell_size = self.grid_size
-        
-        # Create outer box
-        cube = model.occ.addBox(0, 0, 0, x_dim, y_dim, z_dim)
-    
-        # Create central inclusion
-        inclusion = model.occ.addSphere(
-            inclusion_center[0],
-            inclusion_center[1],
-            inclusion_center[2],
-            inclusion_radius
+        geom = GeometryGenerator(
+            msh_file=self.msh_file,
+            grid_size=self.grid_size,
+            box_size=self.box_size,
+            source_center=self.source_center,
+            source_radius=self.source_radius,
+            inclusion_center=self.inclusion_center,
+            inclusion_scaling=self.inclusion_scaling,
+            inclusion_rotation=self.inclusion_rotation,
         )
 
-        # Create source disk
-        source_disk = model.occ.addDisk(source_x, source_y, source_z, source_radius, source_radius)
-    
-        # Perform boolean fragment
-        outDimTags, _ = model.occ.fragment(
-            [(3, cube), (3, inclusion), (2, source_disk)],
-            []
-        )
-    
-        model.occ.synchronize()
-    
-        # Set mesh size
-        mesh.setSize(model.getEntities(0), main_cell_size)
-    
-        # Add physical groups for volumes only
-        volume_count = 0
-        for dim, tag in outDimTags:
-            if dim == 3:
-                volume_count += 1
-                model.addPhysicalGroup(3, [tag], tag=volume_count)
-    
-        # Optimize mesh
-        gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
-    
-        # Generate and save mesh
-        model.mesh.generate(3)
-
-        self.msh_file.parent.mkdir(parents=True, exist_ok=True)
-        gmsh.write(str(self.msh_file))
-
-        logger.info(f"... Mesh generated: {self.msh_file} ...")
+        geom.generate_ellipsoid_geometry()
+#
+#    def _generate_geometry(self):
+#        logger = getLogger("simlog")
+#        logger.info("... Mesh not found. Generating new mesh ...")
+#
+#        gmsh.initialize()
+#        gmsh.option.setNumber("General.Terminal", 0);
+#        gmsh.clear()
+#
+#        # Some abbreviations
+#        model = gmsh.model
+#        mesh = model.mesh
+# 
+#        # Extract geometry parameters
+#        x_dim = self.box_size
+#        y_dim = self.box_size
+#        z_dim = self.box_size
+#    
+#        # Source geometry
+#        source_x, source_y, source_z = self.source_center
+#        source_radius = self.source_radius
+#    
+#        # Inclusion geometry
+#        #inclusion_center = (x_dim / 2, y_dim / 2, z_dim / 2)
+#        inclusion_center = self.inclusion_center
+#        inclusion_radius = self.inclusion_radius
+#        
+#        main_cell_size = self.grid_size
+#        
+#        # Create outer box
+#        cube = model.occ.addBox(0, 0, 0, x_dim, y_dim, z_dim)
+#    
+#        # Create central inclusion
+#        inclusion = model.occ.addSphere(
+#            inclusion_center[0],
+#            inclusion_center[1],
+#            inclusion_center[2],
+#            inclusion_radius
+#        )
+#
+#        # Create source disk
+#        source_disk = model.occ.addDisk(source_x, source_y, source_z, source_radius, source_radius)
+#    
+#        # Perform boolean fragment
+#        outDimTags, _ = model.occ.fragment(
+#            [(3, cube), (3, inclusion), (2, source_disk)],
+#            []
+#        )
+#    
+#        model.occ.synchronize()
+#    
+#        # Set mesh size
+#        mesh.setSize(model.getEntities(0), main_cell_size)
+#    
+#        # Add physical groups for volumes only
+#        volume_count = 0
+#        for dim, tag in outDimTags:
+#            if dim == 3:
+#                volume_count += 1
+#                model.addPhysicalGroup(3, [tag], tag=volume_count)
+#    
+#        # Optimize mesh
+#        gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+#    
+#        # Generate and save mesh
+#        model.mesh.generate(3)
+#
+#        self.msh_file.parent.mkdir(parents=True, exist_ok=True)
+#        gmsh.write(str(self.msh_file))
+#
+#        logger.info(f"... Mesh generated: {self.msh_file} ...")
 
     def _extract_mesh_info(self):
         """ Get information from Gmsh file """
@@ -292,7 +319,6 @@ class Mesh3d:
         jacobians, determinants, _ = gmsh.model.mesh.getJacobians(4, localCoords)
         self.gmsh_jacobians = jacobians.reshape(-1, 3, 3)
         self.gmsh_determinants = determinants
-
         
     def _get_mapped_nodal_cordinates(self):
         """ returns x, y, and z arrays of coordinates of nodes from EToV and VX, VY, VZ, arrays"""

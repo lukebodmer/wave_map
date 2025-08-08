@@ -59,13 +59,21 @@ class DataExtractor:
     
             density = material.get("inclusion_density")
             speed = material.get("inclusion_wave_speed")
-            center = mesh.get("inclusion_center", [None, None, None])
-            radius = mesh.get("inclusion_radius")
-    
-            if None in (density, speed, radius) or any(c is None for c in center):
+            #center = mesh.get("inclusion_center", [None, None, None])
+            rotation = mesh.get("inclusion_rotation", [None, None, None])
+            scaling = mesh.get("inclusion_scaling", [None, None, None])
+            
+            if (
+                density is None or
+                speed is None or
+                #any(c is None for c in center) or
+                any(r is None for r in rotation) or
+                any(s is None for s in scaling)
+               ):
                 raise ValueError("Missing parameter(s)")
-    
-            return [density, speed, *center, radius]
+
+            #return [density, speed, *center, radius]
+            return [density, speed, *rotation, *scaling]
         except Exception as e:
             print(f"Error reading parameters from {toml_file}: {e}")
             return None

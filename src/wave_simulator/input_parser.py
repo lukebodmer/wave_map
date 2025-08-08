@@ -5,17 +5,16 @@ from typing import List, Optional
 
 @dataclass
 class SourceConfig:
-    center: List[float] = field(default_factory=lambda: [0.125, 0.125, 0.0])
-    radius: float = 0.02
+    center: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.0])
+    radius: float = 0.05
     amplitude: float = 0.1
-    frequency: float = 20.0
+    frequency: float = 30.0
 
 
 @dataclass
 class MaterialConfig:
     inclusion_density: float = 8.0
     inclusion_wave_speed: float = 3.0
-    inclusion_radius: float = 3.0
     outer_density: float = 1.0
     outer_wave_speed: float = 1.5
 
@@ -24,8 +23,9 @@ class MaterialConfig:
 class MeshConfig:
     grid_size: float = 0.008
     box_size: float = 0.25
-    inclusion_radius: float = 0.05
-    inclusion_center: List[float] = field(default_factory=lambda: [0.125, 0.125, 0.125])
+    inclusion_center: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.5])
+    inclusion_scaling: List[float] = field(default_factory=lambda: [0.1, 0.1, 0.1])
+    inclusion_rotation: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
 
 
 @dataclass

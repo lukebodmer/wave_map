@@ -1,14 +1,19 @@
 [general]
-run_family_name = "single_moving_sphere"
+run_family_name = "single_rotated_ellipsoid"
 number_initial_parameter_files_to_create = 100
 base_config_path = "parameters.toml"
 
 [inclusion]
 inclusion_wave_speed_range = [0.5, 2.0]
 inclusion_density_range = [0.5, 2.0]
-inclusion_radius_range = [0.03, 0.07]
-allow_inclusion_to_move = true
+inclusion_scaling_range = [
+    [0.125, 0.375],  # axis_u
+    [0.125, 0.375],  # axis_v
+    [0.125, 0.375],  # axis_w
+]
+allow_inclusion_to_rotate = true
+allow_inclusion_to_move = false
 
 [geometry]
-boundary_buffer = 0.02
+boundary_buffer = 0.05
 

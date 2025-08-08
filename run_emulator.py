@@ -8,9 +8,11 @@ from emulator.emulation_setup import EmulationSetup
 def main(parameter_file):
     emulator = EmulationSetup(config_path=parameter_file)
     emulator.run()
+    # test results
+    # create PPE
+    # test PPE 
 
 if __name__ == "__main__":
-    import sys
 
     if len(sys.argv) < 1:
         print("Usage: python run_emulator.py <parameter_file>")
