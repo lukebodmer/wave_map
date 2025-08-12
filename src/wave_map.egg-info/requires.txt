@@ -1,0 +1,15 @@
+numpy>=1.20.0
+scipy>=1.7.0
+matplotlib>=3.5.0
+gmsh>=4.8.0
+pyvista>=0.35.0
+panel>=1.0.0
+sympy>=1.9.0
+toml>=0.10.0
+
+[:python_version < "3.11"]
+tomli>=2.0.0
+
+[dev]
+pytest>=6.0.0
+black>=22.0.0

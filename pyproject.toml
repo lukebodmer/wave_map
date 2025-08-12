@@ -3,13 +3,13 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wave-simulator"
+name = "wave-map"
 version = "0.1.0"
 description = "Wave Map"
-readme = "README.org"
+readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "luke", email = ""}
+    {name = "luke"}
 ]
 requires-python = ">=3.8"
 dependencies = [
@@ -31,12 +31,13 @@ dev = [
 ]
 
 [project.scripts]
-wave-simulation = "wave_map.scripts.run_simulation:main"
-wave-emulator = "wave_map.scripts.run_emulator:main"
-wave-gui = "wave_map.scripts.run_gui:main"
-
-[tool.setuptools.package-data]
-"wave_simulator" = ["config/*.toml"]
+wave-simulation = "wave_simulator.cli.run_simulation:main"
+wave-emulator = "wave_simulator.cli.run_emulator:main"
+wave-gui = "wave_simulator.cli.run_gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# Include default TOML configs inside wave_simulator package
+"wave_simulator" = ["config/*.toml"]

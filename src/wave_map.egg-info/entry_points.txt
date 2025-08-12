@@ -1,0 +1,4 @@
+[console_scripts]
+wave-emulator = wave_simulator.cli.run_emulator:main
+wave-gui = wave_simulator.cli.run_gui:main
+wave-simulation = wave_simulator.cli.run_simulation:main
