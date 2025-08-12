@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wave-map"
+name = "wave_map"
 version = "0.1.0"
 description = "Wave Map"
 readme = "README.md"
@@ -31,9 +31,11 @@ dev = [
 ]
 
 [project.scripts]
-wave-simulation = "wave_simulator.cli.run_simulation:main"
-wave-emulator = "wave_simulator.cli.run_emulator:main"
-wave-gui = "wave_simulator.cli.run_gui:main"
+wave_map = "scripts.run_simulation:main"
+wave-simulation = "scripts.run_simulation:main"
+wave-emulator = "scripts.run_emulator:main"
+wave-gui = "scripts.run_gui:main"
+
 
 [tool.setuptools.packages.find]
 where = ["src"]
