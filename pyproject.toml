@@ -7,7 +7,7 @@ name = "wave_map"
 version = "0.1.0"
 description = "Wave Map"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "luke"}
 ]
@@ -31,14 +31,7 @@ dev = [
 ]
 
 [project.scripts]
-wave_map = "scripts.run_simulation:main"
-wave-simulation = "scripts.run_simulation:main"
-wave-emulator = "scripts.run_emulator:main"
-wave-gui = "scripts.run_gui:main"
-
-
-[tool.setuptools.packages.find]
-where = ["src"]
+wave_map = "cli.run_simulation:main"
 
 [tool.setuptools.package-data]
 # Include default TOML configs inside wave_simulator package
