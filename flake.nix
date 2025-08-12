@@ -27,7 +27,7 @@
               #  # Python packages
               (pkgs.python312.withPackages (python-pkgs: [
               #  # packages for formatting/ IDE
-              #  python-pkgs.pip
+                python-pkgs.pip
                 python-pkgs.python-lsp-server
               #  # packages for code
                 python-pkgs.gmsh

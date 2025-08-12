@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "wave-simulator"
 version = "0.1.0"
-description = "Discontinuous Galerkin finite element method for wave simulation from scratch in Python"
+description = "Wave Map"
 readme = "README.org"
 license = {text = "MIT"}
 authors = [
@@ -31,5 +31,12 @@ dev = [
 ]
 
 [project.scripts]
-run-wave-simulation = "run_simulation:main"
-run-wave-gui = "run_gui:main"
+wave-simulation = "wave_map.scripts.run_simulation:main"
+wave-emulator = "wave_map.scripts.run_emulator:main"
+wave-gui = "wave_map.scripts.run_gui:main"
+
+[tool.setuptools.package-data]
+"wave_simulator" = ["config/*.toml"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
