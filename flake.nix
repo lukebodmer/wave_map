@@ -1,58 +1,87 @@
 {
-  description = "Simulations and inverse problems";
+  description = "A Python Package";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     custom-nixpkgs.url = "github:lukebodmer/custom_nixpkgs";
-
-    pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
-    pyproject-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, custom-nixpkgs, pyproject-nix, ... }:
-      let
-        system = "x86_64-linux";
 
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ custom-nixpkgs.overlays.default ];
+  outputs = { self, nixpkgs, custom-nixpkgs, ... }:
+    let
+      system = "x86_64-linux";
+      ## Import nixpkgs:
+
+      pkgs = import nixpkgs {
+        inherit system;
+        overlays = [ custom-nixpkgs.overlays.default ];
+      };
+
+      ## Read pyproject.toml file:
+      pyproject = builtins.fromTOML (builtins.readFile ./pyproject.toml);
+
+      ## Get project specification:
+      project = pyproject.project;
+
+      ## Get the wave_map package:
+      package = pkgs.python3Packages.buildPythonPackage {
+        ## Set the package name:
+        pname = project.name;
+
+        ## Inherit the package version:
+        inherit (project) version;
+
+        ## Set the package format:
+        format = "pyproject";
+
+        ## Set the package source:
+        src = ./.;
+
+        ## Specify the build system to use:
+        build-system = with pkgs.python3Packages; [
+          setuptools
+        ];
+        ## Specify production dependencies:
+        propagatedBuildInputs = [
+          pkgs.python3Packages.gmsh
+          pkgs.python3Packages.numpy
+          pkgs.python3Packages.pyvista
+          pkgs.python3Packages.panel
+          pkgs.python3Packages.scipy
+          pkgs.python3Packages.tomli
+        ];
+
+      };
+
+      ## Make our package editable:
+      editablePackage = pkgs.python3.pkgs.mkPythonEditablePackage {
+        pname = project.name;
+        inherit (project) scripts version;
+        root = "$PWD/src";
+      };
+    in
+      {
+        ## Project packages output:
+        packages = {
+          "${project.name}" = package;
+          default = self.packages.${system}.${project.name};
         };
 
-	project = pyproject-nix.lib.project.loadPyproject {
-          projectRoot = ./.;
-	};
+        ## Project development shell output:
+        devShells.${system}.default =
+          pkgs.mkShell {
+            inputsFrom = [
+              package
+            ];
 
-	python = pkgs.python312;
+            buildInputs = [
+              # my package
+              editablePackage
 
-      in
-	{
-          devShells.${system}.default =
-            let
-              # Returns a function that can be passed to `python.withPackages`
-              arg = project.renderers.withPackages { inherit python; };
+	      # tools
+              pkgs.python3Packages.python-lsp-server
+            ];
 
-              # Returns a wrapped environment (virtualenv like) with all our packages
-              pythonEnv = python.withPackages arg;
-
-            in
-              # Create a devShell like normal.
-              pkgs.mkShell {
-		packages = [ pythonEnv ];
-
-		shellHook = ''
-		  export VIRTUAL_ENV="Wave Map"
-		'';
-	      };
-
-	  # Build our package using `buildPythonPackage
-	  packages.${system}.default =
-            let
-              # Returns an attribute set that can be passed to `buildPythonPackage`.
-              attrs = project.renderers.buildPythonPackage { inherit python; };
-            in
-              # Pass attributes to buildPythonPackage.
-              # Here is a good spot to add on any missing or custom attributes.
-              python.pkgs.buildPythonPackage (attrs // { env.CUSTOM_ENVVAR = "hello"; });
-    };
+          };
+      };
 }
-

@@ -1,44 +1,35 @@
 import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+from importlib import resources
+from wave_map.simulator.simulation_setup import SimulationSetup
 
-from wave_simulator.simulation_setup import SimulationSetup
+def get_config_path(filename="parameters.toml"):
+    try:
+        # As pathlib.Path
+        return resources.files("wave_map.config") / filename
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Could not find {filename} in wave_map.config")
 
-#from wave_simulator.parameter_space_sampler import ParameterSpaceSampler 
-import cProfile
-
-def main(parameter_file, run_family_name = "default_family"):
+def main(parameter_file=None, run_family_name="default"):
+    if parameter_file is None:
+        parameter_file = get_config_path()
     
-    #profiler = cProfile.Profile()
-    #profiler.enable()
-    #sampler = ParameterSpaceSampler('parameters.toml').create_parameter_files()
-    #extractor = PPEDataExtractor("./outputs")
-    setup = SimulationSetup(config_path=parameter_file,
-                            run_family_name=run_family_name)
-    #X, Y = extractor.extract()
-    #print("Input shape (X):", X.shape)
-    #print("Output shape (Y):", Y.shape)
-
-    # Optional: Save
-    #np.save("ppe_inputs.npy", X)
-    #np.save("ppe_outputs_pressure.npy", Y)
+    setup = SimulationSetup(
+        config_path=str(parameter_file),
+        run_family_name=run_family_name
+    )
     sim = setup.build_simulator()
     sim.run()
-    #profiler.disable()
-    #profiler.dump_stats('profile_results.prof')  # Save for analysis
 
 if __name__ == "__main__":
-    import sys
-
-    # run_name = "my_sim"
-    # run_family_name = "default"
     default_family = "default"
-
+    
     if len(sys.argv) < 2:
-        print("Usage: python script.py <parameter_file> [<run_family_name>]")
-        sys.exit(1)
-
-    run_name = sys.argv[1]
-    run_family_name = sys.argv[2] if len(sys.argv) > 2 else default_family
-
-    main(run_name, run_family_name)
+        try:
+            main(run_family_name=default_family)
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+    else:
+        parameter_file = sys.argv[1]
+        run_family_name = sys.argv[2] if len(sys.argv) > 2 else default_family
+        main(parameter_file, run_family_name)

@@ -27,7 +27,7 @@ polynomial_order = 2
 sensors_per_face = 9
 
 [output_intervals]
-image = 4000
-data = 4000
+image = 10
+data = 100
 points = 10
-energy = 0
+energy = 50

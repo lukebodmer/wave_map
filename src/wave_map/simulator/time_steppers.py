@@ -1,6 +1,6 @@
 import numpy as np
 from logging import getLogger
-from wave_simulator.physics import LinearAcoustics
+from wave_map.simulator.physics import LinearAcoustics
 
 
 class LowStorageRungeKutta:

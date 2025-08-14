@@ -20,7 +20,7 @@ dependencies = [
     "pyvista>=0.35.0",
     "panel>=1.0.0",
     "sympy>=1.9.0",
-    "tomli>=2.0.0; python_version<'3.11'",
+    "tomli>=2.0.0",
     "toml>=0.10.0",
 ]
 
@@ -29,10 +29,21 @@ dev = [
     "pytest>=6.0.0",
     "black>=22.0.0",
 ]
+[tool.setuptools]
+package-dir = {"" = "src"}  # Add this section to point to your src directory
 
 [project.scripts]
-wave_map = "cli.run_simulation:main"
+wave_map = "wave_map.cli.run_simulation:main"
+run_simulation = "wave_map.cli.run_simulation:main"
+run_emulator = "wave_map.cli.run_emulator:main"
+run_gui = "wave_map.cli.run_gui:main"
+
+#[tool.setuptools.package-data]
+## Include default TOML configs inside wave_simulator package
+#"simulator" = ["config/*.toml"]
 
 [tool.setuptools.package-data]
-# Include default TOML configs inside wave_simulator package
-"wave_simulator" = ["config/*.toml"]
+wave_map.config = ["*.toml"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

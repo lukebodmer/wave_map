@@ -1,18 +1,19 @@
-import tomli
 import pickle
+import tomli
 import json
 import shutil
 import hashlib
 import sys
 from pathlib import Path
-from wave_simulator.simulator import Simulator
-from wave_simulator.sensor_placer import SensorPlacer
-from wave_simulator.finite_elements import LagrangeElement
-from wave_simulator.mesh import Mesh3d
-from wave_simulator.physics import LinearAcoustics
-from wave_simulator.time_steppers import LowStorageRungeKutta
-from wave_simulator.logger import Logger
-from wave_simulator.input_parser import (
+
+from wave_map.simulator.simulation_manager import SimulationManager
+from wave_map.simulator.sensor_placer import SensorPlacer
+from wave_map.simulator.finite_elements import LagrangeElement
+from wave_map.simulator.mesh import Mesh3d
+from wave_map.simulator.physics import LinearAcoustics
+from wave_map.simulator.time_steppers import LowStorageRungeKutta
+from wave_map.simulator.logger import Logger
+from wave_map.simulator.input_parser import (
     InputParser,
     SourceConfig,
     MaterialConfig,
@@ -188,7 +189,7 @@ class SimulationSetup:
 
         sensor_coordinates = sensor_placer.get_sensor_coordinates()
 
-        sim = Simulator(time_stepper,
+        sim = SimulationManager(time_stepper,
                         output_path=self.output_path,
                         save_image_interval=cfg.output_intervals.image,
                         save_points_interval=cfg.output_intervals.points,

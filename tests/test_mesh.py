@@ -2,9 +2,9 @@ import pytest
 import matplotlib.pyplot as plt
 import numpy as np
 import gmsh
-from wave_simulator.mesh import Mesh3d
-from wave_simulator.finite_elements import LagrangeElement
-from wave_simulator.reference_element_operators import ReferenceElementOperators
+from wave_map.wave_simulator.mesh import Mesh3d
+from wave_map.wave_simulator.finite_elements import LagrangeElement
+from wave_map.wave_simulator.reference_element_operators import ReferenceElementOperators
 
 @pytest.fixture(scope="module")
 def finite_element():

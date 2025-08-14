@@ -3,15 +3,15 @@ import numpy as np
 from pathlib import Path
 import random
 
-from emulator.input_parser import InputParser
-from emulator.data_extractor import DataExtractor  # Adjust if import path differs
-from emulator.parameter_file_generator import ParameterFileGenerator
-from emulator.logger import Logger  # Ensure you have a Logger class
-from wave_simulator.simulation_setup import SimulationSetup
+from wave_map.batch_runner.input_parser import InputParser
+from wave_map.batch_runner.data_extractor import DataExtractor
+from wave_map.batch_runner.parameter_file_generator import ParameterFileGenerator
+from wave_map.batch_runner.logger import Logger
+from wave_map.simulator.simulation_setup import SimulationSetup
 
 import os
 
-class EmulationSetup:
+class BatchRunnerSetup:
 
     def __init__(self, config_path: Path):
         self.config_path = Path(config_path)
@@ -19,6 +19,7 @@ class EmulationSetup:
 
         self.run_family_name = self.cfg.general.run_family_name
         self.base_output_dir = Path(f"data/emulator_data/{self.run_family_name}")
+        self.mesh_output_dir = Path(f"data/meshes/{self.run_family_name}")
 
         self.test_set_percentage = 10  # can be parameterized if needed
         self.test_hashes_file = self.base_output_dir / "test_hashes.txt"
@@ -92,6 +93,41 @@ class EmulationSetup:
         gen.create_parameter_files(n_samples=n_expected)
         self.create_test_set()
 
+    def _generate_mesh_files_if_needed(self):
+        mesh_files_dir = self.mesh_output_dir
+        n_expected = self.cfg.general.number_initial_parameter_files_to_create
+
+        if parameter_files_dir.exists() and len(list(parameter_files_dir.glob("*.toml"))) >= n_expected:
+            self.logger.info("Parameter files already exist. Skipping generation.")
+            return
+
+        self.logger.info(f"Generating {n_expected} parameter files...")
+
+        # Load the base_config to get the domain_size (mesh.box_size)
+        base_config_path = self.cfg.general.base_config_path
+        try:
+            with open(base_config_path, "rb") as f:
+                base_config = tomli.load(f)
+            domain_size = base_config["mesh"]["box_size"]
+        except Exception as e:
+            self.logger.info(f"Failed to read domain size from base_config_path: {e}")
+            domain_size = 0.25  # default fallback
+
+        gen = ParameterFileGenerator(
+            base_config_path=base_config_path,
+            run_family_name=self.run_family_name,
+            inclusion_density_range=tuple(self.cfg.inclusion.inclusion_density_range),
+            inclusion_speed_range=tuple(self.cfg.inclusion.inclusion_wave_speed_range),
+            inclusion_scaling_range=tuple(self.cfg.inclusion.inclusion_scaling_range),
+            allow_inclusion_to_rotate=self.cfg.inclusion.allow_inclusion_to_rotate,
+            allow_inclusion_to_move=self.cfg.inclusion.allow_inclusion_to_move,
+            boundary_buffer=self.cfg.geometry.boundary_buffer,
+            domain_size=domain_size,
+        )
+
+        gen.create_parameter_files(n_samples=n_expected)
+        self.create_test_set()
+
     def check_completed_simulations(self):
         parameter_files_dir = self.base_output_dir / "parameter_files"
         outputs_dir = Path(f"data/outputs/{self.run_family_name}")
@@ -125,20 +161,20 @@ class EmulationSetup:
             self.completed_all_training_simulations = True
             self.logger.info("All simulations completed.")
 
-    def gather_data(self):
-        self.logger.info("Gathering training/test data from simulations...")
-        extractor = DataExtractor(
-            run_family_name=self.run_family_name,
-            test_hashes_file=self.test_hashes_file
-        )
-        X_train, Y_train, X_test, Y_test = extractor.extract()
-    
-        np.save(self.base_output_dir / "ppe_inputs_train.npy", X_train)
-        np.save(self.base_output_dir / "ppe_outputs_train.npy", Y_train)
-        np.save(self.base_output_dir / "ppe_inputs_test.npy", X_test)
-        np.save(self.base_output_dir / "ppe_outputs_test.npy", Y_test)
-    
-        self.logger.info("Saved train/test datasets: X_train.npy, Y_train.npy, X_test.npy, Y_test.npy.")
+#    def gather_data(self):
+#        self.logger.info("Gathering training/test data from simulations...")
+#        extractor = DataExtractor(
+#            run_family_name=self.run_family_name,
+#            test_hashes_file=self.test_hashes_file
+#        )
+#        X_train, Y_train, X_test, Y_test = extractor.extract()
+#    
+#        np.save(self.base_output_dir / "ppe_inputs_train.npy", X_train)
+#        np.save(self.base_output_dir / "ppe_outputs_train.npy", Y_train)
+#        np.save(self.base_output_dir / "ppe_inputs_test.npy", X_test)
+#        np.save(self.base_output_dir / "ppe_outputs_test.npy", Y_test)
+#    
+#        self.logger.info("Saved train/test datasets: X_train.npy, Y_train.npy, X_test.npy, Y_test.npy.")
 
     def run(self):
         if not self.unsimulated_hashes:
@@ -148,20 +184,20 @@ class EmulationSetup:
         self.logger.info(f"Running {len(self.unsimulated_hashes)} missing simulations...")
         parameter_files_dir = self.base_output_dir / "parameter_files"
 
-        for h in self.unsimulated_hashes:
-            parameter_file = parameter_files_dir / f"{h}.toml"
+        for hash in self.unsimulated_hashes:
+            parameter_file = parameter_files_dir / f"{hash}.toml"
 
             if not parameter_file.exists():
                 self.logger.info(f"Parameter file {parameter_file} not found. Skipping.")
                 continue
 
             try:
-                self.logger.info(f"Running simulation {h}")
+                self.logger.info(f"Running simulation {hash}")
                 setup = SimulationSetup(config_path=parameter_file, run_family_name=self.run_family_name)
                 sim = setup.build_simulator()
                 sim.run()
-                self.logger.info(f"Completed simulation for: {h}")
+                self.logger.info(f"Completed simulation for: {hash}")
             except Exception as e:
-                self.logger.info(f"Simulation failed for {h}: {e}")
+                self.logger.info(f"Simulation failed for {hash}: {e}")
 
-        self.gather_data()
+#        self.gather_data()

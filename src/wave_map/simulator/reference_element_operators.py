@@ -1,5 +1,5 @@
 import numpy as np
-from wave_simulator.finite_elements import LagrangeElement
+from wave_map.simulator.finite_elements import LagrangeElement
 
 
 class ReferenceElementOperators:

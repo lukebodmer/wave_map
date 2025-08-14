@@ -1,9 +1,11 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+#!/usr/bin/env python3
+import panel as pn
+from wave_map.gui.user_interface import UserInterface
 
-from gui.user_interface import UserInterface 
+# Create the Panel app (this is what panel serve will use)
+app = UserInterface(outputs_dir='data/outputs').show()
 
-
-ui = UserInterface(outputs_dir='data/outputs')
-ui.show().servable()
+# Required main() function for pyproject.toml script entry
+def main():
+    """Entry point for script usage"""
+    pn.serve(app)

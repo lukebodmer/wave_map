@@ -7,7 +7,7 @@ import pyvista as pv
 import gmsh
 
 from pathlib import Path
-from wave_simulator.visualizer import Visualizer
+from wave_map.simulator.visualizer import Visualizer
 
 pn.extension('vtk')
 

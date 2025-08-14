@@ -4,12 +4,12 @@ import pickle
 import time
 import numpy as np
 from logging import getLogger
-from wave_simulator.time_steppers import LowStorageRungeKutta
-from wave_simulator.visualizer import Visualizer
-from wave_simulator.spatial_evaluator import SpatialEvaluator
+from wave_map.simulator.time_steppers import LowStorageRungeKutta
+from wave_map.simulator.visualizer import Visualizer
+from wave_map.simulator.spatial_evaluator import SpatialEvaluator
 
 
-class Simulator:
+class SimulationManager:
     def __init__(self,
                  time_stepper: LowStorageRungeKutta,
                  output_path,
