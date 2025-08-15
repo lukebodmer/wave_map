@@ -11,7 +11,7 @@ outer_density = 1.0
 outer_wave_speed = 1.0
 
 [mesh]
-grid_size = 0.03
+grid_size = 0.1
 box_size = 1.00
 inclusion_center = [0.5, 0.5, 0.5]
 inclusion_scaling = [0.22, 0.18, 0.18]
