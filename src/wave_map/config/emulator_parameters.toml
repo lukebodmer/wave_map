@@ -1,6 +1,6 @@
 [general]
-run_family_name = "single_rotated_ellipsoid"
-number_initial_parameter_files_to_create = 100
+batch_name = "testers"
+number_initial_parameter_files_to_create = 2
 base_config_path = "parameters.toml"
 
 [inclusion]

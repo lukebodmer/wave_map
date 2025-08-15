@@ -75,10 +75,21 @@ class OutputIntervals:
 
 
 @dataclass
-class InputParser:
+class SimulationInputParser:
     source: SourceConfig = field(default_factory=SourceConfig)
     material: MaterialConfig = field(default_factory=MaterialConfig)
     mesh: MeshConfig = field(default_factory=MeshConfig)
     solver: SolverConfig = field(default_factory=SolverConfig)
     receivers: ReceiversConfig = field(default_factory=ReceiversConfig)
     output_intervals: OutputIntervals = field(default_factory=OutputIntervals)
+
+    @classmethod
+    def from_toml(cls, cfg: dict):
+        return cls(
+            source=SourceConfig(**cfg.get("source", {})),
+            material=MaterialConfig(**cfg.get("material", {})),
+            mesh=MeshConfig(**cfg.get("mesh", {})),
+            solver=SolverConfig(**cfg.get("solver", {})),
+            receivers=ReceiversConfig(**cfg.get("receivers", {})),
+            output_intervals=OutputIntervals(**cfg.get("output_intervals", {})),
+        )

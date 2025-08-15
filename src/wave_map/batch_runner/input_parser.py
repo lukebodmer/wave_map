@@ -5,13 +5,13 @@ from typing import List, Optional
 
 @dataclass
 class GeneralConfig:
-    run_family_name: str
+    batch_name: str
     number_initial_parameter_files_to_create: int
     base_config_path: str
 
     def __post_init__(self):
-        if not isinstance(self.run_family_name, str):
-            raise TypeError("run_family_name must be a string.")
+        if not isinstance(self.batch_name, str):
+            raise TypeError("batch_name must be a string.")
         if not isinstance(self.base_config_path, str):
             raise TypeError("base_config_path must be a string.")
         if not isinstance(self.number_initial_parameter_files_to_create, int) or self.number_initial_parameter_files_to_create < 0:
@@ -59,7 +59,7 @@ class GeometryConfig:
 
 
 @dataclass
-class InputParser:
+class BatchInputParser:
     general: Optional[GeneralConfig] = None
     inclusion: Optional[InclusionConfig] = None
     geometry: Optional[GeometryConfig] = None

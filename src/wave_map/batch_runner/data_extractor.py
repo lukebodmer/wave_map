@@ -7,8 +7,8 @@ from pathlib import Path
 class DataExtractor:
     """Extracts parameters and final pressure data from simulation output folders."""
 
-    def __init__(self, run_family_name="default_family", test_hashes_file=None):
-        self.base_dir = Path(f"data/outputs/{run_family_name}")
+    def __init__(self, batch_name="default_family", test_hashes_file=None):
+        self.base_dir = Path(f"data/simulation_batch_data/{batch_name}/simulations")
         self.test_hashes = set()
     
         if test_hashes_file and Path(test_hashes_file).exists():

@@ -11,7 +11,7 @@ class ParameterFileGenerator:
     def __init__(
         self,
         base_config_path: str,
-        run_family_name: str,
+        batch_name: str,
         inclusion_density_range: Tuple[float, float] = (0.1, 2.0),
         inclusion_speed_range: Tuple[float, float] = (0.1, 2.0),
         inclusion_scaling_range: Tuple[Tuple[float, float], ...] = ((0.03, 0.07),) * 3,
@@ -22,7 +22,7 @@ class ParameterFileGenerator:
         seed: int = 42
     ):
         self.base_config = self._load_base_config(base_config_path)
-        self.output_dir = Path(f"data/emulator_data/{run_family_name}/parameter_files/")
+        self.output_dir = Path(f"data/simulation_batch_data/{batch_name}/parameter_files/")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.rng = np.random.default_rng(seed)
 

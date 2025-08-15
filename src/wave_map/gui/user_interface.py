@@ -12,7 +12,7 @@ from wave_map.simulator.visualizer import Visualizer
 pn.extension('vtk')
 
 class UserInterface:
-    def __init__(self, outputs_dir='data/outputs'):
+    def __init__(self, outputs_dir='data/simulation_batch_data'):
         self.outputs_dir = Path(outputs_dir)
 
         self.sim_families = self._get_sim_families()
@@ -70,11 +70,12 @@ class UserInterface:
         ])
     
     def _get_sim_folders(self, family_name):
-        family_path = self.outputs_dir / family_name
-        if not family_path.exists():
+        """Return simulation run folders under {family_name}/simulations"""
+        sim_path = self.outputs_dir / family_name / "simulations"
+        if not sim_path.exists():
             return []
         return sorted([
-            f.name for f in family_path.iterdir()
+            f.name for f in sim_path.iterdir()
             if f.is_dir()
         ])
 
@@ -105,6 +106,7 @@ class UserInterface:
             return
         
         self.selected_folder = self.outputs_dir / self.selected_family / event.new
+        self.selected_folder = self.outputs_dir / self.selected_family / "simulations" / event.new
 
         data_dir = self.selected_folder / "data"
         self.data_files = sorted(data_dir.glob("*.pkl"))

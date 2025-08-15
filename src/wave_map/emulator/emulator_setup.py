@@ -9,7 +9,7 @@ class EmulatorSetup():
     def gather_data(self):
         self.logger.info("Gathering training/test data from simulations...")
         extractor = DataExtractor(
-            run_family_name=self.run_family_name,
+            batch_name=self.batch_name,
             test_hashes_file=self.test_hashes_file
         )
         X_train, Y_train, X_test, Y_test = extractor.extract()

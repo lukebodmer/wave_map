@@ -7,6 +7,7 @@ class LowStorageRungeKutta:
     def __init__(
         self,
         physics: LinearAcoustics,
+        dt: float,
         t_initial: float,
         t_final: float = None,
         number_of_timesteps: int = None
@@ -19,6 +20,7 @@ class LowStorageRungeKutta:
         self.t_final = t_final
         self.num_time_steps = number_of_timesteps
         self.t = t_initial
+        self.dt = dt
         self.current_time_step = 0
 
         # Runge-Kutta residual storage
@@ -50,7 +52,7 @@ class LowStorageRungeKutta:
         self.gaussian_decay_scale = 0.001 # for gaussian damping
         self.tau = (3 - np.sqrt(3))/6
         #self._get_source_nodes()
-        self._compute_time_step_size_hesthaven()
+        #self._compute_time_step_size_hesthaven()
         samples_per_cycle = int(round(1 / (self.dt * self.source_frequency)))
         self.source_duration = samples_per_cycle * self.dt
         #self.source_duration = 0.01

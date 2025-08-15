@@ -9,13 +9,13 @@ def get_config_path(filename="parameters.toml"):
     except FileNotFoundError:
         raise FileNotFoundError(f"Could not find {filename} in wave_map.config")
 
-def main(parameter_file=None, run_family_name="default"):
+def main(parameter_file=None, batch_name="default"):
     if parameter_file is None:
         parameter_file = get_config_path()
     
     setup = SimulationSetup(
         config_path=str(parameter_file),
-        run_family_name=run_family_name
+        batch_name=batch_name
     )
     sim = setup.build_simulator()
     sim.run()
@@ -25,11 +25,11 @@ if __name__ == "__main__":
     
     if len(sys.argv) < 2:
         try:
-            main(run_family_name=default_family)
+            main(batch_name=default_family)
         except FileNotFoundError as e:
             print(f"Error: {e}")
             sys.exit(1)
     else:
         parameter_file = sys.argv[1]
-        run_family_name = sys.argv[2] if len(sys.argv) > 2 else default_family
-        main(parameter_file, run_family_name)
+        batch_name = sys.argv[2] if len(sys.argv) > 2 else default_family
+        main(parameter_file, batch_name)

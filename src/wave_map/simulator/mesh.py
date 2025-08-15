@@ -89,12 +89,10 @@ class Mesh3d:
        # self.jacobians = {}
        # #self.determinants = {}
        
-#        self.initialize_gmsh()
         self._extract_mesh_info()
         self._get_material_info()
         self._get_smallest_diameter()
         self._build_connectivityMatricies()
-        #self._compute_gmsh_jacobians()
         self._get_mapped_nodal_cordinates()
         self._compute_mapping_coefficients()
         self._compute_normals_at_face_nodes()
@@ -127,77 +125,6 @@ class Mesh3d:
         )
 
         geom.generate_ellipsoid_geometry()
-#
-#    def _generate_geometry(self):
-#        logger = getLogger("simlog")
-#        logger.info("... Mesh not found. Generating new mesh ...")
-#
-#        gmsh.initialize()
-#        gmsh.option.setNumber("General.Terminal", 0);
-#        gmsh.clear()
-#
-#        # Some abbreviations
-#        model = gmsh.model
-#        mesh = model.mesh
-# 
-#        # Extract geometry parameters
-#        x_dim = self.box_size
-#        y_dim = self.box_size
-#        z_dim = self.box_size
-#    
-#        # Source geometry
-#        source_x, source_y, source_z = self.source_center
-#        source_radius = self.source_radius
-#    
-#        # Inclusion geometry
-#        #inclusion_center = (x_dim / 2, y_dim / 2, z_dim / 2)
-#        inclusion_center = self.inclusion_center
-#        inclusion_radius = self.inclusion_radius
-#        
-#        main_cell_size = self.grid_size
-#        
-#        # Create outer box
-#        cube = model.occ.addBox(0, 0, 0, x_dim, y_dim, z_dim)
-#    
-#        # Create central inclusion
-#        inclusion = model.occ.addSphere(
-#            inclusion_center[0],
-#            inclusion_center[1],
-#            inclusion_center[2],
-#            inclusion_radius
-#        )
-#
-#        # Create source disk
-#        source_disk = model.occ.addDisk(source_x, source_y, source_z, source_radius, source_radius)
-#    
-#        # Perform boolean fragment
-#        outDimTags, _ = model.occ.fragment(
-#            [(3, cube), (3, inclusion), (2, source_disk)],
-#            []
-#        )
-#    
-#        model.occ.synchronize()
-#    
-#        # Set mesh size
-#        mesh.setSize(model.getEntities(0), main_cell_size)
-#    
-#        # Add physical groups for volumes only
-#        volume_count = 0
-#        for dim, tag in outDimTags:
-#            if dim == 3:
-#                volume_count += 1
-#                model.addPhysicalGroup(3, [tag], tag=volume_count)
-#    
-#        # Optimize mesh
-#        gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
-#    
-#        # Generate and save mesh
-#        model.mesh.generate(3)
-#
-#        self.msh_file.parent.mkdir(parents=True, exist_ok=True)
-#        gmsh.write(str(self.msh_file))
-#
-#        logger.info(f"... Mesh generated: {self.msh_file} ...")
 
     def _extract_mesh_info(self):
         """ Get information from Gmsh file """

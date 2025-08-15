@@ -49,6 +49,7 @@
           pkgs.python3Packages.panel
           pkgs.python3Packages.scipy
           pkgs.python3Packages.tomli
+          pkgs.python3Packages.toml
         ];
 
       };

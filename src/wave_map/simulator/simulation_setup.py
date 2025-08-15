@@ -6,15 +6,17 @@ import hashlib
 import sys
 from pathlib import Path
 
+from wave_map.hash_functions.parameter_hashing import ParameterHashFunctions
 from wave_map.simulator.simulation_manager import SimulationManager
 from wave_map.simulator.sensor_placer import SensorPlacer
 from wave_map.simulator.finite_elements import LagrangeElement
 from wave_map.simulator.mesh import Mesh3d
 from wave_map.simulator.physics import LinearAcoustics
 from wave_map.simulator.time_steppers import LowStorageRungeKutta
+from wave_map.simulator.time_step_size_calculator import TimeStepSizeCalculator 
 from wave_map.simulator.logger import Logger
 from wave_map.simulator.input_parser import (
-    InputParser,
+    SimulationInputParser,
     SourceConfig,
     MaterialConfig,
     MeshConfig,
@@ -23,13 +25,15 @@ from wave_map.simulator.input_parser import (
     OutputIntervals,
 )
 
-
 class SimulationSetup:
     def __init__(self,
+                 dt: float,
                  config_path: Path,
-                 run_family_name="default_family"):
+                 batch_name="default",
+                 ):
+        self.dt = dt
         self.config_path = Path(config_path)
-        self.base_output_dir = Path(f"data/outputs/{run_family_name}")
+        self.base_output_dir = Path(f"data/simulation_batch_data/{batch_name}/simulations")
         self.cfg = self._load_config()
         self.output_path = self._resolve_output_path()
         self.logger = Logger(self.output_path / "log.txt")
@@ -38,7 +42,7 @@ class SimulationSetup:
     def _load_config(self):
         with open(self.config_path, "rb") as f:
             raw = tomli.load(f)
-        return InputParser(
+        return SimulationInputParser(
             source=SourceConfig(**raw["source"]),
             material=MaterialConfig(**raw["material"]),
             mesh=MeshConfig(**raw["mesh"]),
@@ -110,26 +114,20 @@ class SimulationSetup:
         with open(mesh_path, 'wb') as f:
             pickle.dump(mesh_data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def get_mesh_directory(self):
-        mesh_hash = self._get_mesh_hash()
-        return Path(f"data/inputs/meshes/{mesh_hash}")
+    def get_mesh_hash(self):
+        parameter_file = self.config_path
+        with open(parameter_file, "rb") as f:
+            simulation_parameters = tomli.load(f)
+    
+        parser = SimulationInputParser.from_toml(simulation_parameters)
+    
+        hash_functions = ParameterHashFunctions()
+        mesh_hash = hash_functions.get_mesh_hash(parser)
+        return mesh_hash
 
-    def _get_mesh_hash(self):
-        """
-        Create a short hash from mesh-related parameters.
-        """
-        params = {
-            "grid_size": self.cfg.mesh.grid_size,
-            "box_size": self.cfg.mesh.box_size,
-            "source_center": self.cfg.source.center,
-            "source_radius": self.cfg.source.radius,
-            "inclusion_center": self.cfg.mesh.inclusion_center,
-            "inclusion_scaling": self.cfg.mesh.inclusion_scaling,
-            "inclusion_rotation": self.cfg.mesh.inclusion_rotation,
-            "polynomial_order": self.cfg.solver.polynomial_order,
-        }
-        encoded = json.dumps(params, sort_keys=True).encode()
-        return hashlib.sha1(encoded).hexdigest()[:10]
+    def get_mesh_directory(self):
+        mesh_hash = self.get_mesh_hash()
+        return Path(f"data/inputs/meshes/{mesh_hash}")
 
     def _resolve_output_path(self):
         config_hash = self._hash_config()
@@ -141,8 +139,9 @@ class SimulationSetup:
         return path
 
     def _hash_config(self):
-        with open(self.config_path, "rb") as f:
-            return hashlib.sha1(f.read()).hexdigest()[:8]
+        hash_functions = ParameterHashFunctions()
+        simulation_hash = hash_functions.get_simulation_hash(self.config_path)
+        return simulation_hash
 
     def prepare_output_dirs(self):
         (self.output_path / "data").mkdir(parents=True, exist_ok=True)
@@ -168,12 +167,14 @@ class SimulationSetup:
         if cfg.solver.total_time is not None:
             time_stepper = LowStorageRungeKutta(
                 physics=physics,
+                dt=self.dt,
                 t_initial=0.0,
                 t_final=cfg.solver.total_time,
             )
         elif cfg.solver.number_of_timesteps is not None:
             time_stepper = LowStorageRungeKutta(
                 physics=physics,
+                dt=self.dt,
                 t_initial=0.0,
                 number_of_timesteps=cfg.solver.number_of_timesteps,
             )
