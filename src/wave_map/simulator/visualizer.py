@@ -2,7 +2,6 @@ import numpy as np
 import pyvista as pv
 import panel as pn
 import matplotlib.pyplot as plt
-import gmsh
 
 
 class Visualizer:

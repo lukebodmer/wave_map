@@ -94,7 +94,7 @@ class SimulationSetup:
             'ny': mesh.ny,
             'nz': mesh.nz,
             'reference_element': mesh.reference_element,
-            'initialize_gmsh': mesh.initialize_gmsh,
+            #'initialize_gmsh': mesh.open_gmsh_file,
             'speed_per_cell': mesh.speed[0, :],  # First row only
             'density_per_cell': mesh.density[0, :],  # First row only
             'interior_face_node_indices': mesh.interior_face_node_indices,

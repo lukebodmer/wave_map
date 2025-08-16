@@ -7,6 +7,15 @@ from wave_map.simulator.geometry_generator import GeometryGenerator
 
 
 class Mesh3d:
+    """
+    Stores all the mesh related information needed for a finite element
+    problem. This includes mesh vertice coordinates, nodal coordiantes,
+    indices for selecting nodal points on tetrahedra faces, and indices
+    for selecting points on the boundary, etc.
+
+    This class must be passed an element and a gmsh (.msh) file. It
+    does not contain the logic for building the actual mesh.
+    """
     def __init__(self,
                  finite_element: LagrangeElement,
                  msh_file=None,
@@ -55,10 +64,13 @@ class Mesh3d:
         else:
             raise ValueError("Invalid Mesh3d initialization: must provide all geometric parameters.")
 
+        if not gmsh.isInitialized():
+            gmsh.initialize()
+
         if msh_file.exists():
-            self.initialize_gmsh()
+            self.open_gmsh_file()
         else:
-            self._generate_geometry()
+            raise FileNotFoundError(f"Mesh file not found at specified path: {msh_file}. Please verify the file exists at this location.")
 
        # self.num_vertices = 0
        # self.num_cells= 0
@@ -101,30 +113,29 @@ class Mesh3d:
         self._compute_surface_to_volume_jacobian()
         self.log_info()
 
-    def initialize_gmsh(self):
-        gmsh.initialize()
+    def open_gmsh_file(self):
         gmsh.option.setNumber("General.Terminal", 0)
         logger = getLogger("simlog")
         logger.info(f"... Found mesh file {self.msh_file}")
         logger.info("... Processing mesh file  ...")
         gmsh.open(str(self.msh_file))
 
-    def _generate_geometry(self):
-        logger = getLogger("simlog")
-        logger.info("... Mesh not found. Generating new mesh ...")
-
-        geom = GeometryGenerator(
-            msh_file=self.msh_file,
-            grid_size=self.grid_size,
-            box_size=self.box_size,
-            source_center=self.source_center,
-            source_radius=self.source_radius,
-            inclusion_center=self.inclusion_center,
-            inclusion_scaling=self.inclusion_scaling,
-            inclusion_rotation=self.inclusion_rotation,
-        )
-
-        geom.generate_ellipsoid_geometry()
+#    def _generate_geometry(self):
+#        logger = getLogger("simlog")
+#        logger.info("... Mesh not found. Generating new mesh ...")
+#
+#        geom = GeometryGenerator(
+#            msh_file=self.msh_file,
+#            grid_size=self.grid_size,
+#            box_size=self.box_size,
+#            source_center=self.source_center,
+#            source_radius=self.source_radius,
+#            inclusion_center=self.inclusion_center,
+#            inclusion_scaling=self.inclusion_scaling,
+#            inclusion_rotation=self.inclusion_rotation,
+#        )
+#
+#        geom.generate_ellipsoid_geometry()
 
     def _extract_mesh_info(self):
         """ Get information from Gmsh file """

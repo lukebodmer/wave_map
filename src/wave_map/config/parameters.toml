@@ -18,7 +18,7 @@ inclusion_scaling = [0.22, 0.18, 0.18]
 inclusion_rotation = [0.12, 0.08, 0.08]
 
 [solver]
-number_of_timesteps = 5
+number_of_timesteps = 2000
 polynomial_order = 2
 
 [receivers]
@@ -27,7 +27,7 @@ polynomial_order = 2
 sensors_per_face = 9
 
 [output_intervals]
-image = 1
-data = 5
-points = 5
-energy = 5
+image = 100
+data = 100
+points = 10
+energy = 50

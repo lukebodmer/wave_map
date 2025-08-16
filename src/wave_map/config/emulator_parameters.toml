@@ -1,6 +1,6 @@
 [general]
 batch_name = "testers"
-number_initial_parameter_files_to_create = 2
+number_initial_parameter_files_to_create = 200
 base_config_path = "parameters.toml"
 
 [inclusion]

@@ -74,7 +74,7 @@ class BatchRunnerSetup:
         self.min_dt: Optional[float] = None
         self.mesh_info = self._generate_gmsh_files_if_needed()
 
-        self.completed_all_training_simulations = False
+        self.completed_all_simulations = False
         self.unsimulated_hashes: List[str] = []
         self.check_completed_simulations()
 
@@ -93,6 +93,7 @@ class BatchRunnerSetup:
             raise ValueError(f"Invalid TOML format in {file_path}: {e}")
 
     def _load_batch_parameters(self) -> BatchInputParser:
+        """Load a toml file of the batch parameters"""
         config = self._load_toml_file(self.config_path)
         parser = BatchInputParser()
         parser.load_from_toml(config)
@@ -350,11 +351,11 @@ class BatchRunnerSetup:
 
         missing_runs = parameter_hashes - simulated_hashes
         if missing_runs:
-            self.completed_all_training_simulations = False
+            self.completed_all_simulations = False
             self.unsimulated_hashes = sorted(missing_runs)
             self.logger.info("Found parameter files that have not been simulated.")
         else:
-            self.completed_all_training_simulations = True
+            self.completed_all_simulations = True
             self.logger.info("All simulations completed.")
 
     def run(self) -> None:
