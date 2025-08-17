@@ -37,6 +37,7 @@ wave_map = "wave_map.cli.run_simulation:main"
 run_simulation = "wave_map.cli.run_simulation:main"
 run_simulation_batch = "wave_map.cli.run_simulation_batch:main"
 run_gui = "wave_map.cli.run_gui:main"
+train_and_test_ppe = "wave_map.cli.train_and_test_ppe:main"
 
 #[tool.setuptools.package-data]
 ## Include default TOML configs inside wave_simulator package

@@ -43,11 +43,14 @@
         ];
         ## Specify production dependencies:
         propagatedBuildInputs = [
+          pkgs.python3.pkgs.cppimport
+          pkgs.python3Packages.distutils
           pkgs.python3Packages.gmsh
           pkgs.python3Packages.numpy
           pkgs.python3Packages.pyvista
           pkgs.python3Packages.panel
           pkgs.python3Packages.scipy
+          pkgs.python3Packages.sklearn-compat
           pkgs.python3Packages.tomli
           pkgs.python3Packages.toml
         ];
