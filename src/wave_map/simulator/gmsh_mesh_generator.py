@@ -20,7 +20,7 @@ class GmshMeshGenerator:
         self.source_radius = self.sim.source.radius
         self.inclusion_center = np.array(self.sim.mesh.inclusion_center)
         self.inclusion_scaling = np.array(self.sim.mesh.inclusion_scaling)
-        self.inclusion_rotation = np.array(self.sim.mesh.inclusion_rotation)
+        self.inclusion_semi_major_axis_direction = np.array(self.sim.mesh.inclusion_semi_major_axis_direction)
 
         self.smallest_radii = None
 
@@ -56,29 +56,43 @@ class GmshMeshGenerator:
         return np.diag([a, b, c])
 
     def _create_rotation_matrix(self):
-        axis = self.inclusion_rotation
+        """
+        Create rotation matrix that aligns the x-axis [1,0,0] with the
+        inclusion_semi_major_axis_direction vector.
+        """
+        # normalize target direction
+        v = self.inclusion_semi_major_axis_direction
+        if np.linalg.norm(v) == 0:
+            return np.eye(3)  # no rotation
+        
+        v = v / np.linalg.norm(v)
+        x_axis = np.array([1.0, 0.0, 0.0])
+        
+        # compute rotation axis and angle
+        axis = np.cross(x_axis, v)
         angle = np.linalg.norm(axis)
-
+        
         if angle == 0:
-            return np.eye(3)
-
-        u = axis / angle
-        ux, uy, uz = u
+            return np.eye(3)  # already aligned
+        
+        axis = axis / angle  # normalize rotation axis
+        ux, uy, uz = axis
         cos_theta = np.cos(angle)
         sin_theta = np.sin(angle)
         one_minus_cos = 1 - cos_theta
-
+    
         return np.array([
             [cos_theta + ux**2 * one_minus_cos,
-             ux * uy * one_minus_cos - uz * sin_theta,
-             ux * uz * one_minus_cos + uy * sin_theta],
-            [uy * ux * one_minus_cos + uz * sin_theta,
-             cos_theta + uy**2 * one_minus_cos,
-             uy * uz * one_minus_cos - ux * sin_theta],
-            [uz * ux * one_minus_cos - uy * sin_theta,
-             uz * uy * one_minus_cos + ux * sin_theta,
-             cos_theta + uz**2 * one_minus_cos]
+             ux*uy*one_minus_cos - uz*sin_theta,
+             ux*uz*one_minus_cos + uy*sin_theta],
+            [uy*ux*one_minus_cos + uz*sin_theta,
+             cos_theta + uy**2*one_minus_cos,
+             uy*uz*one_minus_cos - ux*sin_theta],
+            [uz*ux*one_minus_cos - uy*sin_theta,
+             uz*uy*one_minus_cos + ux*sin_theta,
+             cos_theta + uz**2*one_minus_cos]
         ])
+
 
     def _format_transformation_matrix_for_gmsh(self, A):
         affine_matrix = np.eye(4)
@@ -95,7 +109,7 @@ class GmshMeshGenerator:
     def _create_affine_transformation_matrix(self):
         S = self._axes_scaling()
         R = self._create_rotation_matrix()
-        return S @ R
+        return R @ S
 
     def generate_ellipsoid_geometry(self):
         logger = getLogger("simlog")

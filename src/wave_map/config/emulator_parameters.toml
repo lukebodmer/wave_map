@@ -1,11 +1,11 @@
 [general]
-batch_name = "testers"
-number_initial_parameter_files_to_create = 200
+batch_name = "testing_timestepping"
+number_initial_parameter_files_to_create = 1
 base_config_path = "parameters.toml"
 
 [inclusion]
-inclusion_wave_speed_range = [0.5, 2.0]
-inclusion_density_range = [0.5, 2.0]
+inclusion_wave_speed_range = [1.0, 1.0]
+inclusion_density_range = [1.0, 1.0]
 inclusion_scaling_range = [
     [0.125, 0.375],  # axis_u
     [0.125, 0.375],  # axis_v
@@ -13,7 +13,9 @@ inclusion_scaling_range = [
 ]
 allow_inclusion_to_rotate = true
 allow_inclusion_to_move = false
+inclusion_is_sphere = false
+inclusion_is_ellipsoid_of_revolution = true 
 
 [geometry]
-boundary_buffer = 0.05
+boundary_buffer = 0.01
 

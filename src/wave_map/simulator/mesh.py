@@ -29,7 +29,7 @@ class Mesh3d:
                  inclusion_speed=None,
                  inclusion_center=None,
                  inclusion_scaling=None,
-                 inclusion_rotation=None
+                 inclusion_semi_major_axis_direction=None,
                  ):
         if None not in (msh_file,
                         grid_size,
@@ -42,7 +42,7 @@ class Mesh3d:
                         inclusion_speed,
                         inclusion_center,
                         inclusion_scaling,
-                        inclusion_rotation,
+                        inclusion_semi_major_axis_direction,
                         ):
             self.reference_element = finite_element
             self.reference_element_operators = ReferenceElementOperators(self.reference_element)
@@ -60,7 +60,7 @@ class Mesh3d:
             self.inclusion_speed = inclusion_speed
             self.inclusion_center= inclusion_center
             self.inclusion_scaling= inclusion_scaling
-            self.inclusion_rotation= inclusion_rotation
+            self.inclusion_semi_major_axis_direction=inclusion_semi_major_axis_direction
         else:
             raise ValueError("Invalid Mesh3d initialization: must provide all geometric parameters.")
 
@@ -119,23 +119,6 @@ class Mesh3d:
         logger.info(f"... Found mesh file {self.msh_file}")
         logger.info("... Processing mesh file  ...")
         gmsh.open(str(self.msh_file))
-
-#    def _generate_geometry(self):
-#        logger = getLogger("simlog")
-#        logger.info("... Mesh not found. Generating new mesh ...")
-#
-#        geom = GeometryGenerator(
-#            msh_file=self.msh_file,
-#            grid_size=self.grid_size,
-#            box_size=self.box_size,
-#            source_center=self.source_center,
-#            source_radius=self.source_radius,
-#            inclusion_center=self.inclusion_center,
-#            inclusion_scaling=self.inclusion_scaling,
-#            inclusion_rotation=self.inclusion_rotation,
-#        )
-#
-#        geom.generate_ellipsoid_geometry()
 
     def _extract_mesh_info(self):
         """ Get information from Gmsh file """

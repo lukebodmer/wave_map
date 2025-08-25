@@ -204,6 +204,85 @@ class LinearAcoustics:
 
         return p_p
  
+    #def _apply_boundary_conditions(self, time):
+    #    """
+    #    Apply all boundary conditions including open boundaries and
+    #    characteristic-based source injection for the transducer.
+    #    """
+    #    # --- Interior values ---
+    #    u_m = self.u.ravel('F')[self.interior_indices]
+    #    v_m = self.v.ravel('F')[self.interior_indices]
+    #    w_m = self.w.ravel('F')[self.interior_indices]
+    #    p_m = self.p.ravel('F')[self.interior_indices]
+    #
+    #    # --- Ghost/exterior values ---
+    #    u_p = self.u.ravel('F')[self.exterior_indices]
+    #    v_p = self.v.ravel('F')[self.exterior_indices]
+    #    w_p = self.w.ravel('F')[self.exterior_indices]
+    #    p_p = self.p.ravel('F')[self.exterior_indices]
+    #
+    #    # --- Boundary indices ---
+    #    boundary = self.boundary_indices
+    #
+    #    # Normal vectors at boundary
+    #    nx = self.mesh.nx.ravel(order='F')
+    #    ny = self.mesh.ny.ravel(order='F')
+    #    nz = self.mesh.nz.ravel(order='F')
+    #
+    #    # --- Compute normal velocity at interior boundary ---
+    #    ndotum = nx[boundary] * u_m[boundary] + ny[boundary] * v_m[boundary] + nz[boundary] * w_m[boundary]
+    #
+    #    # --- Open boundary conditions for non-source boundaries ---
+    #    # Reflecting commented out for open boundary
+    #    u_p[boundary] = u_m[boundary]
+    #    v_p[boundary] = v_m[boundary]
+    #    w_p[boundary] = w_m[boundary]
+    #    p_p[boundary] = 0.0  # open boundary
+    #
+    #    # --- Characteristic-based source injection ---
+    #    source_nodes = self.source_nodes_boundary
+    #    if len(source_nodes) > 0:
+    #        # Normal vectors at source nodes
+    #        nx_s = self.mesh.nx.ravel(order='F')[source_nodes]
+    #        ny_s = self.mesh.ny.ravel(order='F')[source_nodes]
+    #        nz_s = self.mesh.nz.ravel(order='F')[source_nodes]
+    #
+    #        # Interior values at source nodes
+    #        p_m_s = p_m[source_nodes]
+    #        u_m_s = u_m[source_nodes]
+    #        v_m_s = v_m[source_nodes]
+    #        w_m_s = w_m[source_nodes]
+    #
+    #        ndotv_m_s = nx_s*u_m_s + ny_s*v_m_s + nz_s*w_m_s
+    #
+    #        # Outgoing characteristic
+    #        #w_plus = p_m_s + self.rho * self.c * ndotv_m_s
+    #        w_plus = p_m_s + ndotv_m_s
+    #
+    #        # Desired incoming characteristic = source pressure
+    #        source_pressure = self._get_source_pressure(time)
+    #        w_minus = source_pressure * np.ones_like(w_plus)
+    #
+    #        # Reconstruct ghost/exterior states
+    #        p_p_s = 0.5 * (w_plus + w_minus)
+    #        #ndotv_p_s = 0.5 * (w_plus - w_minus) / (self.rho * self.c)
+    #        ndotv_p_s = 0.5 * (w_plus - w_minus)
+    #
+    #        # Assign velocities along normal
+    #        u_p_s = u_m_s + (ndotv_p_s - ndotv_m_s) * nx_s
+    #        v_p_s = v_m_s + (ndotv_p_s - ndotv_m_s) * ny_s
+    #        w_p_s = w_m_s + (ndotv_p_s - ndotv_m_s) * nz_s
+    #
+    #        # Update ghost arrays
+    #        p_p[source_nodes] = p_p_s
+    #        u_p[source_nodes] = u_p_s
+    #        v_p[source_nodes] = v_p_s
+    #        w_p[source_nodes] = w_p_s
+    #
+    #    # --- Reshape for matrix operations ---
+    #    self.u_m, self.v_m, self.w_m, self.p_m = self._reshape_to_rectangular(u_m, v_m, w_m, p_m)
+    #    self.u_p, self.v_p, self.w_p, self.p_p = self._reshape_to_rectangular(u_p, v_p, w_p, p_p)
+
     def _apply_boundary_conditions(self, time):
         # get interior values on cells
         u_m = self.u.ravel('F')[self.interior_indices]

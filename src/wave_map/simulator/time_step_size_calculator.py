@@ -13,4 +13,11 @@ class TimeStepSizeCalculator:
         Standard CFL condition:
             dt = smallest_radii / ((2 * polynomial_order + 1) * max_wave_speed)
         """
-        return self.smallest_radii / ((2 * self.polynomial_order + 1) * self.max_wave_speed)
+
+        cfl_factor = 0.9
+        d = self.smallest_radii * 2
+        n = self.polynomial_order
+        c = self.max_wave_speed
+        dt = cfl_factor * (d / (n * n * c))
+        #return dt
+        return cfl_factor * self.smallest_radii / ((2 * self.polynomial_order + 1) * self.max_wave_speed)

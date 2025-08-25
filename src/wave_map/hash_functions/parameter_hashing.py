@@ -17,7 +17,7 @@ class ParameterHashFunctions:
                 "source_radius": simulation_parameters.source.radius,
                 "inclusion_center": simulation_parameters.mesh.inclusion_center,
                 "inclusion_scaling": simulation_parameters.mesh.inclusion_scaling,
-                "inclusion_rotation": simulation_parameters.mesh.inclusion_rotation,
+                "inclusion_semi_major_axis_direction": simulation_parameters.mesh.inclusion_semi_major_axis_direction,
                 "polynomial_order": simulation_parameters.solver.polynomial_order,
             }
     

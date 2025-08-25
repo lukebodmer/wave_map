@@ -44,7 +44,8 @@ class Visualizer:
         self.jacobians = self.mesh["cell_jacobians"]
         self.inclusion_center = self.mesh["inclusion_center"]
         self.inclusion_scaling = self.mesh["inclusion_scaling"]
-        self.inclusion_rotation = self.mesh["inclusion_rotation"]
+        self.inclusion_semi_major_axis_direction = self.mesh["inclusion_semi_major_axis_direction"]
+
         self.vertex_coordinates = self.mesh["vertex_coordinates"]
         self.cell_to_vertices = self.mesh["cell_to_vertices"]
         self.face_node_indices = self.mesh["reference_element"].face_node_indices
@@ -468,58 +469,55 @@ class Visualizer:
     def add_inclusion_boundary(self):
         center = self.inclusion_center
         scaling = self.inclusion_scaling
-        rotation = self.inclusion_rotation
-    
+        axis_dir = np.array(self.inclusion_semi_major_axis_direction)
+        axis_dir = axis_dir / np.linalg.norm(axis_dir)
+
         # Step 1: Create a unit sphere centered at origin
-        sphere = pv.Sphere(radius=1.0,
-                           center=(0, 0, 0),
-                           theta_resolution=30,
-                           phi_resolution=30)
-    
-        # Step 2: Build the rotation matrix from axis-angle
-        angle = np.linalg.norm(rotation)
-        if angle == 0:
+        sphere = pv.Sphere(
+            radius=1.0,
+            center=(0, 0, 0),
+            theta_resolution=30,
+            phi_resolution=30
+        )
+
+        # Step 2: Build rotation matrix to align x-axis with axis_dir
+        x_axis = np.array([1.0, 0.0, 0.0])
+        v = np.cross(x_axis, axis_dir)
+        s = np.linalg.norm(v)
+        c = np.dot(x_axis, axis_dir)
+
+        if s == 0:  # already aligned
             R = np.eye(3)
         else:
-            u = rotation / angle
-            ux, uy, uz = u
-            cos_theta = np.cos(angle)
-            sin_theta = np.sin(angle)
-            one_minus_cos = 1 - cos_theta
-    
-            R = np.array([
-                [cos_theta + ux**2 * one_minus_cos,
-                 ux * uy * one_minus_cos - uz * sin_theta,
-                 ux * uz * one_minus_cos + uy * sin_theta],
-                [uy * ux * one_minus_cos + uz * sin_theta,
-                 cos_theta + uy**2 * one_minus_cos,
-                 uy * uz * one_minus_cos - ux * sin_theta],
-                [uz * ux * one_minus_cos - uy * sin_theta,
-                 uz * uy * one_minus_cos + ux * sin_theta,
-                 cos_theta + uz**2 * one_minus_cos]
+            vx, vy, vz = v / s
+            K = np.array([
+                [0, -vz, vy],
+                [vz, 0, -vx],
+                [-vy, vx, 0]
             ])
-    
-        # Step 3: Combine scaling and rotation: A = R @ S
+            R = np.eye(3) + K + K @ K * ((1 - c) / (s**2))
+
+        # Step 3: Apply scaling
         S = np.diag(scaling)
         A = R @ S
-    
-        # Step 4: Build full 4x4 homogeneous transformation matrix
+
+        # Step 4: Build homogeneous transform
         transform_matrix = np.eye(4)
-        transform_matrix[:3, :3] = A        # linear part
-        transform_matrix[:3, 3] = center    # translation
-    
-        # Step 5: Create a PyVista Transform object
+        transform_matrix[:3, :3] = A
+        transform_matrix[:3, 3] = center
+
+        # Step 5: Apply the transform
         transform = pv.Transform()
         transform.matrix = transform_matrix
-    
-        # Step 6: Apply the transform
         transformed_sphere = sphere.transform(transform, inplace=False)
-    
-        # Step 7: Add to plotter
-        self.plotter.add_mesh(transformed_sphere,
-                              color="#ccdee6",
-                              opacity=0.1,
-                              show_edges=True)
+
+        # Step 6: Add to plotter
+        self.plotter.add_mesh(
+            transformed_sphere,
+            color="#ccdee6",
+            opacity=0.1,
+            show_edges=True
+        )
 
     def save(self):
         file_name = f't_{self.current_time_step:0>8}.png'
@@ -598,13 +596,23 @@ class Visualizer:
             "y": "Velocity (v)",
             "z": "Velocity (w)"
         }
-
+    
+        # Set font sizes
+        plt.rcParams.update({
+            'font.size': 14,           # General font size
+            'axes.titlesize': 16,      # Title font size
+            'axes.labelsize': 15,      # Axis label font size
+            'xtick.labelsize': 12,     # X-axis tick label font size
+            'ytick.labelsize': 12,     # Y-axis tick label font size
+            'legend.fontsize': 12      # Legend font size
+        })
+    
         total_plots = sum(len(entry["points"]) for entry in self.tracked_fields.values())
         fig, axes = plt.subplots(total_plots, 1, figsize=(10, 20), sharex=True)
-
+    
         if total_plots == 1:
             axes = [axes]
-
+    
         plot_idx = 0
         for field_key, entry in self.tracked_fields.items():
             color = color_map.get(field_key, "black")
@@ -621,19 +629,21 @@ class Visualizer:
                     markersize=4,
                     label=label
                 )
-                ax.set_title(f"{label} at (x={x:.3f}, y={y:.3f}, z={z:.3f})")
-                ax.set_ylabel(label)
+                ax.set_title(f"{label} at (x={x:.3f}, y={y:.3f}, z={z:.3f})", fontsize=16)  # Explicit title size
+                ax.set_ylabel(label, fontsize=15)  # Explicit y-label size
                 ax.grid(True, alpha=0.3)
                 ax.set_xlim(0, self.t_final - self.dt)  # set x-limits to full time
                 plot_idx += 1
     
-        axes[-1].set_xlabel("Time (s)")
-        plt.tight_layout()
-
+        axes[-1].set_xlabel("Time (s)", fontsize=15)  # Explicit x-label size
+        
+        # Adjust layout to prevent clipping with larger fonts
+        plt.tight_layout(pad=3.0)  # Increase padding
+    
         if show:
             plt.show()
             return
-
+    
         return fig
 
     def plot_sensor_data_as_matrix(self, show=False):
@@ -654,7 +664,8 @@ class Visualizer:
         points = pressure_entry["points"]
     
         fig, ax = plt.subplots(figsize=(12, 12))
-        vmax = np.abs(data_matrix).max()
+        #vmax = np.abs(data_matrix).max()
+        vmax = 0.003
         vmin = -vmax
 
         cax = ax.imshow(data_matrix, aspect='auto', cmap='seismic', origin='lower', vmin=vmin, vmax=vmax)

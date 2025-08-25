@@ -17,11 +17,15 @@ class LowStorageRungeKutta:
 
         self.physics = physics
         self.t_initial = t_initial
-        self.t_final = t_final
         self.num_time_steps = number_of_timesteps
         self.t = t_initial
         self.dt = dt
         self.current_time_step = 0
+
+        if t_final is None:
+            self.t_final = self.num_time_steps * self.dt
+        else:
+            self.t_final = t_final
 
         # Runge-Kutta residual storage
         nodes_per_cell = physics.mesh.reference_element.nodes_per_cell

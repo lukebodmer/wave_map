@@ -208,7 +208,8 @@ class UserInterface:
                 return
 
             self.visualizer = Visualizer(mesh_data, data)
-            tracked_fig = self.visualizer.plot_sensor_data_as_matrix()
+            #tracked_fig = self.visualizer.plot_sensor_data_as_matrix()
+            tracked_fig = self.visualizer.plot_tracked_points()
 
             if data['save_energy_interval'] > 0:
                 energy_fig = self.visualizer.plot_energy()

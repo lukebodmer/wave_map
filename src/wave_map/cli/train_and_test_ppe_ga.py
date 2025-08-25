@@ -1,12 +1,16 @@
-import sys
+# train_and_test_ppe_ga.py
+
+# --- imports remain the same ---
 import numpy as np
 import pickle
+import matplotlib.pyplot as plt
 from pathlib import Path
 import toml
+import sys
 from sklearn.model_selection import train_test_split
 
 from wave_map.PyRobustGaSP import PyRobustGaSP
-from wave_map.input_space_samplers.mcmc import McmcSampler
+from wave_map.input_space_samplers.genetic_sampler import GeneticSampler  # <-- we’ll implement later
 
 
 def load_simulation_data(batch_name):
@@ -43,12 +47,12 @@ def load_simulation_data(batch_name):
                 inputs.append(input_features)
                 outputs.append(sensor_data.flatten())
                 simulation_ids.append(sim_dir.name)
-    
+ 
     return np.array(inputs), np.array(outputs), simulation_ids
 
 
 def main(batch_name="single_moving_sphere_variable_radius", test_split=0.05, random_state=42):
-    """Train PPE model or load, then test with MCMC inverse search on test samples."""
+    """Train PPE model or load, then test with GA inverse search on test samples."""
     print(f"Preparing PPE model for batch: {batch_name}")
     
     project_root = Path(__file__).parent.parent.parent.parent
@@ -71,7 +75,7 @@ def main(batch_name="single_moving_sphere_variable_radius", test_split=0.05, ran
             inputs, outputs, sim_ids, test_size=test_split, random_state=random_state
         )
         P_rgasp = PyRobustGaSP()
-        task = P_rgasp.create_task(X_train, y_train, nugget_est=True, num_initial_values=10)
+        task = P_rgasp.create_task(X_train, y_train, nugget_est=True, num_initial_values=5)
         model = P_rgasp.train_ppgasp(task)
         predictions = P_rgasp.predict_ppgasp(model, X_test)['mean']
         mse = np.mean((predictions - y_test)**2)
@@ -89,8 +93,9 @@ def main(batch_name="single_moving_sphere_variable_radius", test_split=0.05, ran
         with open(test_results_file, 'wb') as f:
             pickle.dump(test_results, f)
     
-    # --- Inverse test with single MCMC sampler ---
-    print("\nRunning MCMC inverse search on all test cases...")
+    # --- Inverse test with GA on all test cases ---
+    print("\nRunning Genetic Algorithm inverse search on all test cases...")
+
     P_rgasp = PyRobustGaSP()
 
     bounds = np.array([
@@ -110,53 +115,51 @@ def main(batch_name="single_moving_sphere_variable_radius", test_split=0.05, ran
     def predict_fn(x: np.ndarray) -> np.ndarray:
         return P_rgasp.predict_ppgasp(model, x.reshape(1, -1))['mean'][0]
 
-    param_ranges = bounds[:, 1] - bounds[:, 0]
-    proposal_scale = 0.3 * param_ranges  # 10% of range
-
-    sampler = McmcSampler(
+    sampler = GeneticSampler(
         model=predict_fn,
-        proposal_scale=proposal_scale,
-        burn_in=0,
-        thin=1,
+        bounds=bounds,
+        population_size=1000,
+        n_generations=200,
+        #mutation_rate=0.20,
+        #crossover_rate=0.8,
         random_state=42,
-        likelihood_method="gaussian",
-        use_simulated_annealing=True,
-        initial_temp=10.0,
-        cooling_rate=0.9999,
-        #l2_threshold=0.01,
+        fitness_type="l2"
     )
 
     for i, (true_input, target_output) in enumerate(zip(test_results['X_test'], test_results['actual'])):
         if i < 2:
             continue
+    
+        true_input_str = np.array2string(true_input, precision=4, separator=',', suppress_small=True)
+        print(f"True input: {true_input_str}")
 
-        print(f"\nTrue input: {np.array2string(true_input, precision=4, separator=',', suppress_small=True)}\n\n\n\n")
-
-        init_guess = (bounds[:, 0] + bounds[:, 1]) / 2
-
-        result = sampler.sample(
-            target_output=target_output,
-            init_input=init_guess,
-            n_steps=2000,
-            sigma=0.001,
-            bounds=bounds
+        result = sampler.evolve(
+            target_output,
+            #n_elite=10
         )
 
         best_input = result.best_input
         best_error = np.linalg.norm(predict_fn(best_input) - target_output)
 
-        best_str = np.array2string(best_input, precision=4, separator=',', suppress_small=True)
-        true_str = np.array2string(true_input, precision=4, separator=',', suppress_small=True)
-
-        print(f"\nRecovered input:")
-        print(f"True input: {best_str}")
-        print(f"Best input: {true_str}")
-        print(f"Acceptance rate: {result.acceptance_rate:.3f}")
-        print(f"L2 error vs. target output: {best_error:.6f}")
+        print(f"\nTest case {i+1}:")
+        print(f"Best input recovered (GA):")
+        print(f"Wave speed: {true_input[1]:.8f} (true), {best_input[1]:.8f} (predicted)")
+        print(f"Density: {true_input[0]:.8f} (true), {best_input[0]:.8f} (predicted)")
+        print(f"\ntrue_ellipsoid = Ellipsoid(")
+        print(f"    center=[0.5, 0.5, 0.5],")
+        print(f"    scaling=[{true_input[2]:.8f}, {true_input[3]:.8f}, {true_input[4]:.8f}],")
+        #print(f"    rotation_vector=[{true_input[5]:.8f}, {true_input[6]:.8f}, {true_input[7]:.8f}]")
+        print(f")")
+        print(f"\npredicted_ellipsoid = Ellipsoid(")
+        print(f"    center=[0.5, 0.5, 0.5],")
+        print(f"    scaling=[{best_input[2]:.8f}, {best_input[3]:.8f}, {best_input[4]:.8f}],")
+        print(f"    rotation_vector=[{best_input[5]:.8f}, {best_input[6]:.8f}, {best_input[7]:.8f}]")
+        print(f")")
+        print(f"\nL2 error vs. target output: {best_error:.6f}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python train_and_test_ppe.py <batch_name>")
+        print("Usage: python train_and_test_ppe_ga.py <batch_name>")
         sys.exit(1)
     main(batch_name=sys.argv[1])

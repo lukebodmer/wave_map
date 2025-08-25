@@ -79,11 +79,12 @@ class SensorPlacer:
         else:
             base_sensors = self.get_lhs_sensor_coordinates()
 
-        if len(self.additional_sensors) > 0:
-            base_sensors = np.vstack((base_sensors, np.array(self.additional_sensors)))
-
-        # Remove sensors near source
+        # Remove sensors near source (only for base sensors)
         filtered_sensors = self._filter_near_source(base_sensors)
+
+        # Add additional sensors after filtering
+        if len(self.additional_sensors) > 0:
+            filtered_sensors = np.vstack((filtered_sensors, np.array(self.additional_sensors)))
 
         self.sensor_positions = filtered_sensors
         return [list(pos) for pos in filtered_sensors]

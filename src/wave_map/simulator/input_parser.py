@@ -25,7 +25,7 @@ class MeshConfig:
     box_size: float = 0.25
     inclusion_center: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.5])
     inclusion_scaling: List[float] = field(default_factory=lambda: [0.1, 0.1, 0.1])
-    inclusion_rotation: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    inclusion_semi_major_axis_direction: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
 
 
 @dataclass

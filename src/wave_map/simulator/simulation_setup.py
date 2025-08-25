@@ -72,7 +72,7 @@ class SimulationSetup:
             inclusion_speed=cfg.material.inclusion_wave_speed,
             inclusion_center=cfg.mesh.inclusion_center,
             inclusion_scaling=cfg.mesh.inclusion_scaling,
-            inclusion_rotation=cfg.mesh.inclusion_rotation,
+            inclusion_semi_major_axis_direction=cfg.mesh.inclusion_semi_major_axis_direction,
         )
 
         # save mesh data needed for visualization
@@ -104,7 +104,7 @@ class SimulationSetup:
             'num_cells': mesh.num_cells,
             'inclusion_center': mesh.inclusion_center,
             'inclusion_scaling': mesh.inclusion_scaling,
-            'inclusion_rotation': mesh.inclusion_rotation,
+            'inclusion_semi_major_axis_direction': mesh.inclusion_semi_major_axis_direction,
             }
         return mesh_data
 

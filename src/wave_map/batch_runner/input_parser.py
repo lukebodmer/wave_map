@@ -24,6 +24,8 @@ class InclusionConfig:
     inclusion_scaling_range: List[List[float]]
     allow_inclusion_to_rotate: bool = False
     allow_inclusion_to_move: bool = False
+    inclusion_is_sphere: bool = False
+    inclusion_is_ellipsoid_of_revolution: bool = False
 
     def __post_init__(self):
         for name, rng in [
@@ -39,14 +41,21 @@ class InclusionConfig:
             if not (isinstance(nested_rng, list) and len(nested_rng) == 3):
                 raise ValueError(f"{name} must have three sublists (for x/y/z axes).")
             for subrange in nested_rng:
-                if not (isinstance(subrange, list) and len(subrange) == 2):
+                if not (isinstance(subrange, list) and len(subrange) == 2 and all(isinstance(v, (int, float)) for v in subrange)):
                     raise ValueError(f"Each sublist in {name} must contain two numbers.")
 
         if not isinstance(self.allow_inclusion_to_move, bool):
             raise TypeError("allow_inclusion_to_move must be a boolean.")
         if not isinstance(self.allow_inclusion_to_rotate, bool):
             raise TypeError("allow_inclusion_to_rotate must be a boolean.")
+        if not isinstance(self.inclusion_is_sphere, bool):
+            raise TypeError("inclusion_is_sphere must be a boolean.")
+        if not isinstance(self.inclusion_is_ellipsoid_of_revolution, bool):
+            raise TypeError("inclusion_is_ellipsoid_of_revolution must be a boolean.")
 
+        # 🚨 Conflict check
+        if self.inclusion_is_sphere and self.inclusion_is_ellipsoid_of_revolution:
+            raise ValueError("inclusion_is_sphere and inclusion_is_ellipsoid_of_revolution cannot both be True.")
 
 
 @dataclass

@@ -146,6 +146,8 @@ class BatchRunnerSetup:
             inclusion_density_range=tuple(self.params.inclusion.inclusion_density_range),
             inclusion_speed_range=tuple(self.params.inclusion.inclusion_wave_speed_range),
             inclusion_scaling_range=tuple(self.params.inclusion.inclusion_scaling_range),
+            inclusion_is_sphere=self.params.inclusion.inclusion_is_sphere,
+            inclusion_is_ellipsoid_of_revolution=self.params.inclusion.inclusion_is_ellipsoid_of_revolution,
             allow_inclusion_to_rotate=self.params.inclusion.allow_inclusion_to_rotate,
             allow_inclusion_to_move=self.params.inclusion.allow_inclusion_to_move,
             boundary_buffer=self.params.geometry.boundary_buffer,
@@ -260,7 +262,10 @@ class BatchRunnerSetup:
 
     def _load_existing_mesh_metadata(self, mesh_hash: str, info: Dict[str, Any]) -> None:
         """Load metadata from existing mesh using mesh_info.toml."""
-        self.logger.info(f"Mesh for hash {mesh_hash} already exists.")
+
+        hash_functions = ParameterHashFunctions()
+        sim_hash = hash_functions.get_simulation_hash(info["param_file"])
+        self.logger.info(f"Mesh {mesh_hash} for simulation {sim_hash} already exists.")
     
         mesh_dir = self.mesh_output_dir / mesh_hash
         mesh_info_file = mesh_dir / MESH_INFO_FILENAME
@@ -271,8 +276,7 @@ class BatchRunnerSetup:
                 info["smallest_radii"] = mesh_data.get("smallest_radii")
     
                 # Always recompute simulation_hash from the parameter file
-                hash_functions = ParameterHashFunctions()
-                info["simulation_hash"] = hash_functions.get_simulation_hash(info["param_file"])
+                info["simulation_hash"] = sim_hash
     
                 if info["smallest_radii"] is None:
                     self.logger.info(f"Warning: No smallest_radii found in mesh info for {mesh_hash}")
@@ -283,16 +287,19 @@ class BatchRunnerSetup:
 
     def _generate_single_mesh(self, mesh_hash: str, info: Dict[str, Any], hash_functions: ParameterHashFunctions) -> None:
         """Generate a single mesh and update info with metadata."""
-        self.logger.info(f"Generating mesh for hash {mesh_hash}...")
         
         config = self._load_toml_file(info["param_file"])
         parser = SimulationInputParser.from_toml(config)
+
+        simulation_hash = hash_functions.get_simulation_hash(info["param_file"])
         
+        self.logger.info(f"Generating mesh {mesh_hash} for simulation {simulation_hash}...")
+
         gmsh_generator = GmshMeshGenerator(parser, mesh_hash)
         gmsh_generator.generate_ellipsoid_geometry()
         
         smallest_radii = gmsh_generator.get_smallest_radii()
-        simulation_hash = hash_functions.get_simulation_hash(info["param_file"])
+
         
         info["smallest_radii"] = smallest_radii
         info["simulation_hash"] = simulation_hash 
@@ -371,15 +378,15 @@ class BatchRunnerSetup:
                 self.logger.info(f"Parameter file {parameter_file} not found. Skipping.")
                 continue
 
-            try:
-                self.logger.info(f"\n... Preparing simulation {hash}")
-                setup = SimulationSetup(dt=self.min_dt, config_path=parameter_file, batch_name=self.batch_name)
-                simulator = setup.build_simulator()
-                simulator.run()
-                self.logger.info(f"Completed simulation for: {hash}")
-            except FileNotFoundError as e:
-                self.logger.info(f"Simulation failed for {hash} - file not found: {e}")
-            except ValueError as e:
-                self.logger.info(f"Simulation failed for {hash} - invalid parameters: {e}")
-            except Exception as e:
-                self.logger.info(f"Simulation failed for {hash} - unexpected error: {e}")
+            #try:
+            self.logger.info(f"\n... Preparing simulation {hash}")
+            setup = SimulationSetup(dt=self.min_dt, config_path=parameter_file, batch_name=self.batch_name)
+            simulator = setup.build_simulator()
+            simulator.run()
+            self.logger.info(f"Completed simulation for: {hash}")
+            #except FileNotFoundError as e:
+            #    self.logger.info(f"Simulation failed for {hash} - file not found: {e}")
+            #except ValueError as e:
+            #    self.logger.info(f"Simulation failed for {hash} - invalid parameters: {e}")
+            #except Exception as e:
+            #    self.logger.info(f"Simulation failed for {hash} - unexpected error: {e}")
