@@ -16,9 +16,9 @@ def load_simulation_data(batch_name):
     return inputs, outputs, simulation_ids
 
 
-def main(batch_name="single_moving_sphere_variable_radius", test_split=0.05, random_state=42):
+def main(batch_name="single_moving_sphere_variable_radius", test_split=0.10, random_state=2):
     """Train PPE model or load, then test its ability to directly solve the inverse problem."""
-    batch_name="rotated_ellipsoid_of_revolution"
+    batch_name="rotating_centered_ellipsoid_v2"
     print(f"Preparing PPE model for batch: {batch_name}")
     
     project_root = Path(__file__).parent.parent.parent.parent
@@ -47,7 +47,7 @@ def main(batch_name="single_moving_sphere_variable_radius", test_split=0.05, ran
         )
 
         P_rgasp = PyRobustGaSP()
-        task = P_rgasp.create_task(X_train, y_train, nugget_est=True, num_initial_values=10)
+        task = P_rgasp.create_task(X_train, y_train)#, nugget_est=True) #, num_initial_values=10)
         model = P_rgasp.train_ppgasp(task)
 
         predictions = P_rgasp.predict_ppgasp(model, X_test)['mean']
@@ -70,7 +70,7 @@ def main(batch_name="single_moving_sphere_variable_radius", test_split=0.05, ran
 
     # --- Direct inverse testing ---
     print("\nEvaluating inverse problem performance (PPE direct mapping)...")
-    for pred, true in zip(test_results['predictions'][:5], test_results['actual'][:5]):
+    for pred, true in zip(test_results['predictions'], test_results['actual']):
         pred_str = np.array2string(pred, precision=4, separator=',', suppress_small=True)
         true_str = np.array2string(true, precision=4, separator=',', suppress_small=True)
         print(f"\nPredicted input: {pred_str}")

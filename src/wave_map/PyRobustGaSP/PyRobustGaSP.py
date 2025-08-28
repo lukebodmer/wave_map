@@ -446,8 +446,8 @@ class PyRobustGaSP(object):
             
             
             for i_cl in range(model_p):
-                print(type((np.max(model_input[:,i_cl])-np.min(model_input[:,i_cl]))/model_num_obs**(1/model_p))
-          )
+                #print(type((np.max(model_input[:,i_cl])-np.min(model_input[:,i_cl]))/model_num_obs**(1/model_p))
+          #)
                 
                 model_CL[i_cl] = ((np.max(model_input[:,i_cl])-np.min(model_input[:,i_cl]))/model_num_obs**(1/model_p))
           
@@ -1170,8 +1170,8 @@ class PyRobustGaSP(object):
         
         if (not model_isotropic):
             for i_cl in range(model_p):
-                print(type((np.max(model_input[:,i_cl])-np.min(model_input[:,i_cl]))/model_num_obs**(1/model_p))
-          ) 
+          #      print(type((np.max(model_input[:,i_cl])-np.min(model_input[:,i_cl]))/model_num_obs**(1/model_p))
+          #) 
                 model_CL[i_cl] = ((np.max(model_input[:,i_cl])-np.min(model_input[:,i_cl]))/model_num_obs**(1/model_p))
         else:
             model_CL[0]=np.max(model_R0[0])/model_num_obs
@@ -1280,7 +1280,7 @@ class PyRobustGaSP(object):
                         
                         ini_value=initial_values[i_ini,:]
                     else:
-                        print(initial_values)
+                        #print(initial_values)
                         ini_value=initial_values[i_ini,0:model_p]
                       ###without the nugget
                     print('The initial values of range parameters are', 1/np.exp(ini_value[0:model_p]),'\n')

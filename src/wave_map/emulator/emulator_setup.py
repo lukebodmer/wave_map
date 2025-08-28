@@ -1,23 +1,60 @@
-from wave_map.batch_runner.logger import Logger
+# File: src/wave_map/emulator/emulator_setup.py
 
-class EmulatorSetup():
-    def __init__(self):
+from pathlib import Path
+from wave_map.emulator.final_data_extractor import FinalDataExtractor
+from wave_map.emulator.results_validator import ResultsValidator
+from wave_map.loggers.logger import Logger
 
-        self.logger = Logger(self.base_output_dir/ "log.txt")
-        pass
+# Constants
+BATCH_DATA_DIR = "data/simulation_batch_data"
+LOG_FILENAME = "log.txt"
 
-    def gather_data(self):
-        self.logger.info("Gathering training/test data from simulations...")
-        extractor = DataExtractor(
-            batch_name=self.batch_name,
-            test_hashes_file=self.test_hashes_file
+
+class EmulatorSetup:
+    """
+    Sets up everything needed to run and validate an emulator batch:
+    - Loads simulation data
+    - Creates a logger
+    - Instantiates the ResultsValidator
+    """
+
+    def __init__(self, batch_name: str, n_splits: int = 5, random_state: int = 42):
+        self.batch_name = batch_name
+        self.n_splits = n_splits
+        self.random_state = random_state
+
+        self.inputs = None
+        self.outputs = None
+        self.simulation_ids = None
+        self.logger = None
+        self.validator = None
+
+        self.base_output_dir = Path(f"{BATCH_DATA_DIR}/{self.batch_name}")
+        self.base_output_dir.mkdir(parents=True, exist_ok=True)
+
+        self._load_data()
+        self._create_logger()
+        self._create_results_validator()
+
+    def _load_data(self):
+        """Load simulation data using FinalDataExtractor."""
+        extractor = FinalDataExtractor(batch_name=self.batch_name)
+        self.inputs, self.outputs, self.simulation_ids = extractor.load()
+
+    def _create_logger(self):
+        """Create a logger for recording emulator validation results."""
+        self.logger = Logger(log_path=self.base_output_dir / LOG_FILENAME, name="emulatorlog")
+
+    def _create_results_validator(self):
+        """Instantiate the ResultsValidator with the loaded data and logger."""
+        self.validator = ResultsValidator(
+            inputs=self.inputs,
+            outputs=self.outputs,
+            simulation_ids=self.simulation_ids,
+            n_splits=self.n_splits,
+            random_state=self.random_state
         )
-        X_train, Y_train, X_test, Y_test = extractor.extract()
-    
-        np.save(self.base_output_dir / "ppe_inputs_train.npy", X_train)
-        np.save(self.base_output_dir / "ppe_outputs_train.npy", Y_train)
-        np.save(self.base_output_dir / "ppe_inputs_test.npy", X_test)
-        np.save(self.base_output_dir / "ppe_outputs_test.npy", Y_test)
-    
-        self.logger.info("Saved train/test datasets: X_train.npy, Y_train.npy, X_test.npy, Y_test.npy.")
 
+    def run_validation(self):
+        """Run k-fold cross-validation via the ResultsValidator."""
+        self.validator.run_k_fold_validation()

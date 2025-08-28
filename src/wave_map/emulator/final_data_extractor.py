@@ -13,7 +13,7 @@ class FinalDataExtractor:
     - Simulation IDs: directory names for traceability
     """
 
-    def __init__(self, batch_name: str, downsample_factor: int = 10):
+    def __init__(self, batch_name: str, downsample_factor: int = 2):
         self.batch_name = batch_name
         self.downsample_factor = downsample_factor
         self.project_root = Path(__file__).parent.parent.parent.parent
@@ -29,11 +29,16 @@ class FinalDataExtractor:
         - Downsample each row (time series) by self.downsample_factor.
         - Flatten into a 1D array.
         """
-        if self.downsample_factor > 1:
-            processed = sensor_data[:, ::self.downsample_factor]
-            processed = processed[:, 1:]
-        else:
-            processed = sensor_data
+       # cut off first timestep
+        processed = sensor_data
+        processed = processed[:, 1:]
+
+        # trim more timesteps from start
+        processed = processed[:, 200:]
+
+        # downsample
+        processed = processed[:, ::self.downsample_factor]
+
         return processed.flatten()
 
     def load(self):

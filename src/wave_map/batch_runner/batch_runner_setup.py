@@ -10,7 +10,7 @@ from wave_map.batch_runner.input_parser import BatchInputParser
 from wave_map.simulator.input_parser import SimulationInputParser
 from wave_map.simulator.time_step_size_calculator import TimeStepSizeCalculator
 from wave_map.batch_runner.parameter_file_generator import ParameterFileGenerator
-from wave_map.batch_runner.logger import Logger
+from wave_map.loggers.logger import Logger
 from wave_map.hash_functions.parameter_hashing import ParameterHashFunctions
 from wave_map.simulator.gmsh_mesh_generator import GmshMeshGenerator
 from wave_map.simulator.simulation_setup import SimulationSetup
@@ -66,7 +66,7 @@ class BatchRunnerSetup:
         self.parameter_files_dir = self.base_output_dir / PARAMETER_FILES_SUBDIR
         self.mesh_output_dir = Path(MESH_DATA_DIR)
 
-        self.logger = Logger(self.base_output_dir / LOG_FILENAME)
+        self.logger = Logger(log_path=self.base_output_dir / LOG_FILENAME, name="batchlog")
         self.prepare_output_dirs()
         self.save_copy_of_config_files()
 

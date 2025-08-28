@@ -565,6 +565,7 @@ class Visualizer:
             return
         return fig
 
+
     def plot_tracked_points(self, show=False):
         """
         Plot each field (pressure or velocity component) at each tracked point on a separate subplot,
@@ -578,37 +579,14 @@ class Visualizer:
         interval = self.data['save_points_interval']
         dt = self.dt
         t = self.current_time_step
-        total_steps = next(iter(self.tracked_fields.values()))["data"].shape[1]
         num_steps = t // interval  # only show data up to this step
-    
-        # Time array for the truncated data
         time_array = np.arange(num_steps) * dt * interval
     
-        color_map = {
-            "pressure": "purple",
-            "x": "blue",
-            "y": "green",
-            "z": "red"
-        }
-        label_map = {
-            "pressure": "Pressure",
-            "x": "Velocity (u)",
-            "y": "Velocity (v)",
-            "z": "Velocity (w)"
-        }
-    
-        # Set font sizes
-        plt.rcParams.update({
-            'font.size': 14,           # General font size
-            'axes.titlesize': 16,      # Title font size
-            'axes.labelsize': 15,      # Axis label font size
-            'xtick.labelsize': 12,     # X-axis tick label font size
-            'ytick.labelsize': 12,     # Y-axis tick label font size
-            'legend.fontsize': 12      # Legend font size
-        })
+        color_map = {"pressure": "purple", "x": "blue", "y": "green", "z": "red"}
+        label_map = {"pressure": "Pressure", "x": "Velocity (u)", "y": "Velocity (v)", "z": "Velocity (w)"}
     
         total_plots = sum(len(entry["points"]) for entry in self.tracked_fields.values())
-        fig, axes = plt.subplots(total_plots, 1, figsize=(10, 20), sharex=True)
+        fig, axes = plt.subplots(total_plots, 1, figsize=(12, 2.5*total_plots), sharex=True)
     
         if total_plots == 1:
             axes = [axes]
@@ -618,33 +596,26 @@ class Visualizer:
             color = color_map.get(field_key, "black")
             label = label_map.get(field_key, field_key)
             for point_idx, (x, y, z) in enumerate(entry["points"]):
-                data_series = entry["data"][point_idx][:num_steps]  # truncate the data
+                data_series = entry["data"][point_idx][:num_steps]
                 ax = axes[plot_idx]
-                ax.plot(
-                    time_array,
-                    data_series,
-                    color=color,
-                    linewidth=1.5,
-                    marker='o',
-                    markersize=4,
-                    label=label
-                )
-                ax.set_title(f"{label} at (x={x:.3f}, y={y:.3f}, z={z:.3f})", fontsize=16)  # Explicit title size
-                ax.set_ylabel(label, fontsize=15)  # Explicit y-label size
+                ax.plot(time_array, data_series, color=color, linewidth=1.5, marker='o', markersize=4, label=label)
+                # Add coordinates as horizontal text above the plot
+                ax.text(-0.1, .50, f"Point {point_idx}: (x={x:.3f}, y={y:.3f}, z={z:.3f})",
+                        transform=ax.transAxes, ha='center', va='bottom', fontsize=10)
+                
                 ax.grid(True, alpha=0.3)
-                ax.set_xlim(0, self.t_final - self.dt)  # set x-limits to full time
+                ax.set_xlim(0, self.t_final - self.dt)
                 plot_idx += 1
     
-        axes[-1].set_xlabel("Time (s)", fontsize=15)  # Explicit x-label size
-        
-        # Adjust layout to prevent clipping with larger fonts
-        plt.tight_layout(pad=3.0)  # Increase padding
+        axes[-1].set_xlabel("Time (s)")
+        plt.tight_layout()
     
         if show:
             plt.show()
             return
     
         return fig
+
 
     def plot_sensor_data_as_matrix(self, show=False):
         """
@@ -665,7 +636,7 @@ class Visualizer:
     
         fig, ax = plt.subplots(figsize=(12, 12))
         #vmax = np.abs(data_matrix).max()
-        vmax = 0.003
+        vmax = 0.100
         vmin = -vmax
 
         cax = ax.imshow(data_matrix, aspect='auto', cmap='seismic', origin='lower', vmin=vmin, vmax=vmax)

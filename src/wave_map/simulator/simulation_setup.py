@@ -14,7 +14,8 @@ from wave_map.simulator.mesh import Mesh3d
 from wave_map.simulator.physics import LinearAcoustics
 from wave_map.simulator.time_steppers import LowStorageRungeKutta
 from wave_map.simulator.time_step_size_calculator import TimeStepSizeCalculator 
-from wave_map.simulator.logger import Logger
+#from wave_map.simulator.logger import Logger
+from wave_map.loggers.logger import Logger
 from wave_map.simulator.input_parser import (
     SimulationInputParser,
     SourceConfig,
@@ -36,7 +37,7 @@ class SimulationSetup:
         self.base_output_dir = Path(f"data/simulation_batch_data/{batch_name}/simulations")
         self.cfg = self._load_config()
         self.output_path = self._resolve_output_path()
-        self.logger = Logger(self.output_path / "log.txt")
+        self.logger = Logger(log_path = self.output_path / "log.txt", name="simlog")
         self.prepare_output_dirs()
 
     def _load_config(self):
