@@ -74,6 +74,7 @@
         ## Project development shell output:
         devShells.${system}.default =
           pkgs.mkShell {
+
             inputsFrom = [
               package
             ];

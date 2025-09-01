@@ -14,7 +14,7 @@ class TimeStepSizeCalculator:
             dt = smallest_radii / ((2 * polynomial_order + 1) * max_wave_speed)
         """
 
-        cfl_factor = 0.9
+        cfl_factor = 0.4
         d = self.smallest_radii * 2
         n = self.polynomial_order
         c = self.max_wave_speed

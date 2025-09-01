@@ -10,6 +10,8 @@ class LinearAcoustics:
                  source_frequency=None,
                  ):
         self.mesh = mesh
+        self.lift = self.mesh.reference_element_operators.lift_matrix
+        self.face_scale = self.mesh.surface_to_volume_jacobian
         self.nodes_per_cell = self.mesh.reference_element.nodes_per_cell
         self.nodes_per_face = self.mesh.reference_element.nodes_per_face
         self.num_cells = self.mesh.num_cells
@@ -32,6 +34,10 @@ class LinearAcoustics:
         self._bulk = None
         self._precompute_indices()
         self._precompute_material_properties()
+        self._precompute_flux_terms()
+        self._precompute_spatial_derivatives()
+
+    def _precompute_spatial_derivatives(self):
         # precompute spatial derivative matrices
         Dr = self.mesh.reference_element_operators.r_differentiation_matrix
         Ds = self.mesh.reference_element_operators.s_differentiation_matrix
@@ -62,12 +68,24 @@ class LinearAcoustics:
         self.rho_m = self.mesh.density.ravel('F')[intr].reshape((Npf*Nf, K), order='F')
         self.c_p = self.mesh.speed.ravel('F')[ext].reshape((Npf*Nf, K), order='F')
         self.c_m = self.mesh.speed.ravel('F')[intr].reshape((Npf*Nf, K), order='F')
-    
+
+    def _precompute_flux_terms(self):
+        self.flux_denominator = self.c_m * self.rho_m + self.c_p * self.rho_p
+        self.Z_p = self.c_p * self.rho_p
+        self.K_m = self.c_m**2 * self.rho_m
+
     def _precompute_indices(self):
         # Current precomputation...
         self.boundary_indices = self.mesh.boundary_face_node_indices
         self.interior_indices = self.mesh.interior_face_node_indices
         self.exterior_indices = self.mesh.exterior_face_node_indices
+        self.interior_indices_flat_array = self.interior_indices.ravel(order='F')
+        self.exterior_indices_flat_array = self.exterior_indices.ravel(order='F')
+        self.boundary_flat = self.boundary_indices.ravel(order='F')
+        # Flattened mesh normals
+        self.nx_flat = self.mesh.nx.ravel(order='F')
+        self.ny_flat = self.mesh.ny.ravel(order='F')
+        self.nz_flat = self.mesh.nz.ravel(order='F')
         self.source_nodes_boundary = self.boundary_indices[self.source_nodes]
 
     def set_initial_conditions(self, kind="none"):
@@ -138,9 +156,9 @@ class LinearAcoustics:
 
     def _get_source_pressure(self, time):
         # choose which source pulse to use
-        return self._compute_shifted_cosine(time)
+        #return self._compute_shifted_cosine(time)
         #return self._compute_sin(time)
-        #return self._compute_gaussian_pulse(time)
+        return self._compute_gaussian_pulse(time)
         #return self._compute_ricker_wavelet(time)
 
     def _locate_source_nodes(self):
@@ -191,71 +209,95 @@ class LinearAcoustics:
         return rho, c
 
 
-    def _apply_source_boundary_condition(self, time, p_p):
-        # get source amplitude
-        source_pressure = self._get_source_pressure(time)
+   # def _apply_source_boundary_condition(self, time, p_p):
+   #     # get source amplitude
+   #     source_pressure = self._get_source_pressure(time)
 
-        # get source node indices 
-        source_nodes = self.source_nodes_boundary  # Precomputed
+   #     # get source node indices 
+   #     source_nodes = self.source_nodes_boundary  # Precomputed
 
-        # Overwrite pressure at the source nodes with the shifted cosine pressure
-        # model where the transducer meets the domain as an open boundary
-        p_p[source_nodes] = source_pressure
+   #     # Overwrite pressure at the source nodes with the shifted cosine pressure
+   #     # model where the transducer meets the domain as an open boundary
+   #     p_p[source_nodes] = source_pressure
 
-        return p_p
+   #     return p_p
  
+    def _get_flat_fields(self):
+        """Return flattened field arrays (Fortran order view, no copy)."""
+        return (
+            self.u.ravel('F'),
+            self.v.ravel('F'),
+            self.w.ravel('F'),
+            self.p.ravel('F'),
+        )
+
+    def _apply_reflecting_bc(self, u_m, v_m, w_m, p_m, u_p, v_p, w_p, p_p, nx, ny, nz):
+        """Apply perfectly reflecting wall BC on boundary faces."""
+        ndotum = (
+            nx[self.boundary_flat] * u_m[self.boundary_flat]
+            + ny[self.boundary_flat] * v_m[self.boundary_flat]
+            + nz[self.boundary_flat] * w_m[self.boundary_flat]
+        )
+    
+        u_p[self.boundary_flat] = u_m[self.boundary_flat] - 2.0 * ndotum * nx[self.boundary_flat]
+        v_p[self.boundary_flat] = v_m[self.boundary_flat] - 2.0 * ndotum * ny[self.boundary_flat]
+        w_p[self.boundary_flat] = w_m[self.boundary_flat] - 2.0 * ndotum * nz[self.boundary_flat]
+        p_p[self.boundary_flat] = p_m[self.boundary_flat]
+    
+    
+    def _apply_source_bc(self, u_m, v_m, w_m, p_m, u_p, v_p, w_p, p_p, nx, ny, nz, time):
+        """Apply source boundary condition on selected nodes."""
+        src = self.source_nodes_boundary
+        if src.size == 0:
+            return  # no source nodes → nothing to do
+    
+        # Driving pressure
+        p_b = self._get_source_pressure(time)
+    
+        # If the pulse is over (or effectively zero), don't override reflecting BC
+        if np.isclose(p_b, 0.0, atol=1e-12):
+            return
+
+        # Local impedance Z = rho * c (plus side)
+        Z = self.rho_p.ravel('F')[src] * self.c_p.ravel('F')[src]
+    
+        # Interior traces at source nodes
+        pm = p_m[src]
+        um, vm, wm = u_m[src], v_m[src], w_m[src]
+        nx_s, ny_s, nz_s = nx[src], ny[src], nz[src]
+    
+        # Normal velocity
+        u_n_m = nx_s * um + ny_s * vm + nz_s * wm
+    
+        # Adjust to enforce target pressure
+        delta_u_n = (pm - p_b) / Z
+    
+        p_p[src] = p_b
+        u_p[src] = um + delta_u_n * nx_s
+        v_p[src] = vm + delta_u_n * ny_s
+        w_p[src] = wm + delta_u_n * nz_s
+
     def _apply_boundary_conditions(self, time):
-        # interior/exterior traces
-        u_m = self.u.ravel('F')[self.interior_indices]
-        v_m = self.v.ravel('F')[self.interior_indices]
-        w_m = self.w.ravel('F')[self.interior_indices]
-        p_m = self.p.ravel('F')[self.interior_indices]
+        # interior/exterior node values 
+        u_flat, v_flat, w_flat, p_flat = self._get_flat_fields()
     
-        u_p = self.u.ravel('F')[self.exterior_indices]
-        v_p = self.v.ravel('F')[self.exterior_indices]
-        w_p = self.w.ravel('F')[self.exterior_indices]
-        p_p = self.p.ravel('F')[self.exterior_indices]
-    
-        boundary = self.boundary_indices
-        nx = self.mesh.nx.ravel(order='F')
-        ny = self.mesh.ny.ravel(order='F')
-        nz = self.mesh.nz.ravel(order='F')
-    
-        # normal velocity on interior trace
-        ndotum = nx[boundary] * u_m[boundary] + ny[boundary] * v_m[boundary] + nz[boundary] * w_m[boundary]
-    
-        # --- choose BC for non-source boundary faces (example: reflecting wall) ---
-        # For a perfectly reflecting wall: u_n = 0 -> mirror the normal component
-        u_p[boundary] = u_m[boundary] - 2.0 * ndotum * nx[boundary]
-        v_p[boundary] = v_m[boundary] - 2.0 * ndotum * ny[boundary]
-        w_p[boundary] = w_m[boundary] - 2.0 * ndotum * nz[boundary]
-        p_p[boundary] = p_m[boundary]
-    
-        # --- characteristic-consistent source patch on selected boundary nodes ---
-        src = self.source_nodes_boundary  # indices into boundary-face-node arrays
-        if src.size > 0:
-            # target pressure on the boundary (your shifted cosine)
-            p_b = self._get_source_pressure(time)
-    
-            # local impedance Z = rho * c on the boundary (use "plus" side)
-            Z = (self.rho_p.ravel('F')[src] * self.c_p.ravel('F')[src])
-    
-            # interior traces at the source nodes
-            pm = p_m[src]
-            um = u_m[src]; vm = v_m[src]; wm = w_m[src]
-            nx_s = nx[src]; ny_s = ny[src]; nz_s = nz[src]
-    
-            # interior normal velocity
-            u_n_m = nx_s * um + ny_s * vm + nz_s * wm
-    
-            # consistent ghost: set p_p = p_b and adjust normal velocity
-            delta_u_n = (pm - p_b) / Z  # amount to add along the normal
-    
-            p_p[src] = p_b
-            u_p[src] = um + delta_u_n * nx_s
-            v_p[src] = vm + delta_u_n * ny_s
-            w_p[src] = wm + delta_u_n * nz_s
-    
+        u_m = u_flat[self.interior_indices_flat_array]
+        v_m = v_flat[self.interior_indices_flat_array]
+        w_m = w_flat[self.interior_indices_flat_array]
+        p_m = p_flat[self.interior_indices_flat_array]
+
+        u_p = u_flat[self.exterior_indices_flat_array]
+        v_p = v_flat[self.exterior_indices_flat_array]
+        w_p = w_flat[self.exterior_indices_flat_array]
+        p_p = p_flat[self.exterior_indices_flat_array]
+
+        #boundary = self.boundary_indices
+        nx, ny, nz = self.nx_flat, self.ny_flat, self.nz_flat
+
+        # Apply BCs
+        self._apply_reflecting_bc(u_m, v_m, w_m, p_m, u_p, v_p, w_p, p_p, nx, ny, nz)
+        self._apply_source_bc(u_m, v_m, w_m, p_m, u_p, v_p, w_p, p_p, nx, ny, nz, time)
+
         # reshape for flux
         self.u_m, self.v_m, self.w_m, self.p_m = self._reshape_to_rectangular(u_m, v_m, w_m, p_m)
         self.u_p, self.v_p, self.w_p, self.p_p = self._reshape_to_rectangular(u_p, v_p, w_p, p_p)
@@ -319,12 +361,6 @@ class LinearAcoustics:
         normal_vel_jump = self.ndotup - self.ndotum
         pressure_jump = self.p_p - self.p_m
     
-        if self.flux_terms_cached == False:
-            self.flux_denominator = self.c_m * self.rho_m + self.c_p * self.rho_p
-            self.Z_p = self.c_p * self.rho_p
-            self.K_m = self.c_m**2 * self.rho_m
-            self.flux_terms_cached = True
-
         num = -self.Z_p * normal_vel_jump + pressure_jump
         common_term = num / self.flux_denominator 
     
@@ -332,6 +368,7 @@ class LinearAcoustics:
         self.flux_u = nx * self.c_m * common_term
         self.flux_v = ny * self.c_m * common_term
         self.flux_w = nz * self.c_m * common_term
+
 
     def _compute_xijun_he_flux(self):
         # flux from Xiun He 2025 - An effective discontinuous galerkin
@@ -391,12 +428,12 @@ class LinearAcoustics:
         #dpdz = drdz * (Dr @ self.p) + dsdz * (Ds @ self.p) + dtdz * (Dt @ self.p)
 
         # Replace derivative calculations with:
-        dudx = np.einsum('ijk,jk->ik', self.Dx, u)
-        dvdy = np.einsum('ijk,jk->ik', self.Dy, v)
-        dwdz = np.einsum('ijk,jk->ik', self.Dz, w)
-        dpdx = np.einsum('ijk,jk->ik', self.Dx, p)
-        dpdy = np.einsum('ijk,jk->ik', self.Dy, p)
-        dpdz = np.einsum('ijk,jk->ik', self.Dz, p)
+        dudx = np.einsum('ijk,jk->ik', self.Dx, u, optimize="optimal")
+        dvdy = np.einsum('ijk,jk->ik', self.Dy, v, optimize="optimal")
+        dwdz = np.einsum('ijk,jk->ik', self.Dz, w, optimize="optimal")
+        dpdx = np.einsum('ijk,jk->ik', self.Dx, p, optimize="optimal")
+        dpdy = np.einsum('ijk,jk->ik', self.Dy, p, optimize="optimal")
+        dpdz = np.einsum('ijk,jk->ik', self.Dz, p, optimize="optimal")
 
         # apply boundary conditions
         self._apply_boundary_conditions(time)
@@ -404,24 +441,15 @@ class LinearAcoustics:
         # compute normal velocity at interior boundary and exterior boundary 
         self.ndotum = self.mesh.nx * self.u_m + self.mesh.ny * self.v_m + self.mesh.nz * self.w_m
         self.ndotup = self.mesh.nx * self.u_p + self.mesh.ny * self.v_p + self.mesh.nz * self.w_p
-        self.mu = np.maximum(self.c_m, self.c_p)
+        #self.mu = np.maximum(self.c_m, self.c_p)
         
         # compute flux
         self._compute_rh_flux()
         #self._compute_xijun_he_flux()
 
-        ## get necessary matricies for integral computation
-        face_scale = self.mesh.surface_to_volume_jacobian
-        lift = self.mesh.reference_element_operators.lift_matrix
-
-        ## inverse density and bulk modulus (rho c^2) - cached for performance
-        if self._inv_rho is None:
-            self._inv_rho = 1.0 / self.mesh.density
-            self._bulk = self.mesh.density * (self.mesh.speed ** 2)
-
-        self.rhs_p = -self._bulk * (dudx + dvdy + dwdz) - lift @ (face_scale * self.flux_p)
-        self.rhs_u = -self._inv_rho * dpdx - lift @ (face_scale * self.flux_u)
-        self.rhs_v = -self._inv_rho * dpdy - lift @ (face_scale * self.flux_v)
-        self.rhs_w = -self._inv_rho * dpdz - lift @ (face_scale * self.flux_w)
+        self.rhs_p = -self._bulk * (dudx + dvdy + dwdz) - self.lift @ (self.face_scale * self.flux_p)
+        self.rhs_u = -self._inv_rho * dpdx - self.lift @ (self.face_scale * self.flux_u)
+        self.rhs_v = -self._inv_rho * dpdy - self.lift @ (self.face_scale * self.flux_v)
+        self.rhs_w = -self._inv_rho * dpdz - self.lift @ (self.face_scale * self.flux_w)
 
         return self.rhs_u, self.rhs_v, self.rhs_w, self.rhs_p

@@ -208,8 +208,8 @@ class UserInterface:
                 return
 
             self.visualizer = Visualizer(mesh_data, data)
-            tracked_fig = self.visualizer.plot_sensor_data_as_matrix()
-            #tracked_fig = self.visualizer.plot_tracked_points()
+            #tracked_fig = self.visualizer.plot_sensor_data_as_matrix()
+            tracked_fig = self.visualizer.plot_tracked_points()
 
             if data['save_energy_interval'] > 0:
                 energy_fig = self.visualizer.plot_energy()
@@ -250,7 +250,7 @@ class UserInterface:
             layout = pn.Row(
                 pn.Column(
                     pn.pane.HTML("<b>Sensors</b>"),
-                    pn.pane.Matplotlib(tracked_fig, tight=True, height=700, width=700),
+                    pn.pane.Matplotlib(tracked_fig, tight=True, height=900, width=500),
                 ),
                 pn.Column(
                     energy_column,

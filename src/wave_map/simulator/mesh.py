@@ -3,7 +3,6 @@ import gmsh
 from logging import getLogger
 from wave_map.simulator.reference_element_operators import ReferenceElementOperators
 from wave_map.simulator.finite_elements import LagrangeElement
-from wave_map.simulator.geometry_generator import GeometryGenerator
 
 
 class Mesh3d:

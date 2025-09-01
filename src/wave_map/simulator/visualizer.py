@@ -600,11 +600,12 @@ class Visualizer:
                 ax = axes[plot_idx]
                 ax.plot(time_array, data_series, color=color, linewidth=1.5, marker='o', markersize=4, label=label)
                 # Add coordinates as horizontal text above the plot
-                ax.text(-0.1, .50, f"Point {point_idx}: (x={x:.3f}, y={y:.3f}, z={z:.3f})",
+                ax.text(0.5, .20, f"{point_idx}: ({x:.2f},{y:.2f},{z:.2f})",
                         transform=ax.transAxes, ha='center', va='bottom', fontsize=10)
                 
                 ax.grid(True, alpha=0.3)
                 ax.set_xlim(0, self.t_final - self.dt)
+                #ax.set_ylim(-0.1, 0.1)
                 plot_idx += 1
     
         axes[-1].set_xlabel("Time (s)")
@@ -636,7 +637,7 @@ class Visualizer:
     
         fig, ax = plt.subplots(figsize=(12, 12))
         #vmax = np.abs(data_matrix).max()
-        vmax = 0.100
+        vmax = 0.200
         vmin = -vmax
 
         cax = ax.imshow(data_matrix, aspect='auto', cmap='seismic', origin='lower', vmin=vmin, vmax=vmax)

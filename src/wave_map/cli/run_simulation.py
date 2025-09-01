@@ -1,6 +1,7 @@
 import sys
 from importlib import resources
 from wave_map.simulator.simulation_setup import SimulationSetup
+from wave_map.simulator.time_step_size_calculator import TimeStepSizeCalculator
 
 def get_config_path(filename="parameters.toml"):
     try:
@@ -9,11 +10,19 @@ def get_config_path(filename="parameters.toml"):
     except FileNotFoundError:
         raise FileNotFoundError(f"Could not find {filename} in wave_map.config")
 
-def main(parameter_file=None, batch_name="default"):
+def main(parameter_file=None, batch_name="single_run_simulations"):
     if parameter_file is None:
         parameter_file = get_config_path()
+
+    calculator = TimeStepSizeCalculator(
+        max_wave_speed=1.0,
+        smallest_radii=0.004249573,
+        polynomial_order=2
+    )
+    dt = calculator.calculate_cfl_dt()
     
     setup = SimulationSetup(
+        dt=dt,
         config_path=str(parameter_file),
         batch_name=batch_name
     )

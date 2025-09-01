@@ -60,9 +60,19 @@ class SimulationSetup:
             n=cfg.solver.polynomial_order
         )
 
+        if cfg.mesh.msh_file is not None:
+            filename = Path(cfg.mesh.msh_file)
+            self.mesh_directory = Path(f"data/inputs/meshes/{filename.stem}")
+            msh_file = self.mesh_directory / filename
+            mesh_path = self.mesh_directory / "mesh.pkl"
+        else:
+            self.mesh_directory = self.get_mesh_directory()
+            msh_file = self.mesh_directory / "mesh.msh"
+            mesh_path = self.mesh_directory / "mesh.pkl"
+
         mesh = Mesh3d(
             finite_element=finite_element,
-            msh_file=self.get_mesh_directory() / "mesh.msh",
+            msh_file=msh_file,
             grid_size=cfg.mesh.grid_size,
             box_size=cfg.mesh.box_size,
             source_center=cfg.source.center,
@@ -77,10 +87,8 @@ class SimulationSetup:
         )
 
         # save mesh data needed for visualization
-        mesh_path = self.get_mesh_directory() / "mesh.pkl"
         if not mesh_path.exists():
-            self.save_mesh_visualization_data(mesh)
-
+            self.save_mesh_visualization_data(mesh, self.mesh_directory)
         return mesh
 
     def get_mesh_data(self, mesh):
@@ -109,9 +117,9 @@ class SimulationSetup:
             }
         return mesh_data
 
-    def save_mesh_visualization_data(self, mesh):
+    def save_mesh_visualization_data(self, mesh, mesh_directory):
         mesh_data = self.get_mesh_data(mesh)
-        mesh_path = self.get_mesh_directory() / "mesh.pkl"
+        mesh_path = mesh_directory / "mesh.pkl"
         with open(mesh_path, 'wb') as f:
             pickle.dump(mesh_data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -201,7 +209,7 @@ class SimulationSetup:
                         u_velocity_reciever_locations=cfg.receivers.x_velocity,
                         v_velocity_reciever_locations=cfg.receivers.y_velocity,
                         w_velocity_reciever_locations=cfg.receivers.z_velocity,
-                        mesh_directory=self.get_mesh_directory()
+                        mesh_directory=self.mesh_directory
                         )
 
         return sim

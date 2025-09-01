@@ -26,7 +26,7 @@ class MeshConfig:
     inclusion_center: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.5])
     inclusion_scaling: List[float] = field(default_factory=lambda: [0.1, 0.1, 0.1])
     inclusion_semi_major_axis_direction: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
-
+    msh_file: Optional[str] = None   # <-- new optional field
 
 @dataclass
 class SolverConfig:

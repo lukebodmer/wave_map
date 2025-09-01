@@ -1,0 +1,58 @@
+         7065332 function calls (7053257 primitive calls) in 57.615 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2334 to 50 due to restriction <50>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.001    0.001   57.615   57.615 /home/lj/projects/wave_map/src/wave_map/cli/run_simulation_batch.py:51(run_simulation_batch)
+        1    0.000    0.000   57.608   57.608 /home/lj/projects/wave_map/src/wave_map/batch_runner/batch_runner_setup.py:368(run)
+        1    0.005    0.005   56.779   56.779 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_manager.py:112(run)
+     1000    1.570    0.002   49.555    0.050 /home/lj/projects/wave_map/src/wave_map/simulator/time_steppers.py:236(advance_time_step)
+     5000   23.696    0.005   47.985    0.010 /home/lj/projects/wave_map/src/wave_map/simulator/physics.py:349(compute_rhs)
+     5000    6.869    0.001   10.347    0.002 /home/lj/projects/wave_map/src/wave_map/simulator/physics.py:207(_apply_boundary_conditions)
+    30000    0.232    0.000    8.467    0.000 /nix/store/y6r8p8dc030rqxxjjp676p1ix2vv3nk0-python3.13-numpy-2.3.1/lib/python3.13/site-packages/numpy/_core/einsumfunc.py:1057(einsum)
+     1000    0.002    0.000    7.020    0.007 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_manager.py:100(_save_scheduled_outputs)
+    30000    6.642    0.000    6.642    0.000 {built-in method numpy._core._multiarray_umath.c_einsum}
+      100    0.074    0.001    6.287    0.063 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_manager.py:225(_evaluate_sensor_data)
+    14500    0.595    0.000    6.214    0.000 /home/lj/projects/wave_map/src/wave_map/simulator/spatial_evaluator.py:19(eval_at_point)
+     5000    5.448    0.001    5.448    0.001 /home/lj/projects/wave_map/src/wave_map/simulator/physics.py:315(_compute_rh_flux)
+   145010    1.108    0.000    4.755    0.000 /home/lj/projects/wave_map/src/wave_map/simulator/finite_elements.py:284(eval_3d_basis_function)
+   185327    3.388    0.000    3.388    0.000 {method 'ravel' of 'numpy.ndarray' objects}
+   435120    3.137    0.000    3.283    0.000 /home/lj/projects/wave_map/src/wave_map/simulator/finite_elements.py:406(eval_jacobi_polynomial)
+    30000    0.667    0.000    1.524    0.000 /nix/store/y6r8p8dc030rqxxjjp676p1ix2vv3nk0-python3.13-numpy-2.3.1/lib/python3.13/site-packages/numpy/_core/einsumfunc.py:742(einsum_path)
+        1    0.000    0.000    0.828    0.828 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_setup.py:152(build_simulator)
+        1    0.000    0.000    0.479    0.479 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_setup.py:55(create_mesh)
+        1    0.000    0.000    0.477    0.477 /home/lj/projects/wave_map/src/wave_map/simulator/mesh.py:19(__init__)
+       11    0.470    0.043    0.475    0.043 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_manager.py:236(_save_energy)
+    14500    0.039    0.000    0.444    0.000 /home/lj/projects/wave_map/src/wave_map/simulator/spatial_evaluator.py:13(get_element)
+   675/82    0.002    0.000    0.440    0.005 /nix/store/g6wibm1x0gzib5v59xc69zmrzdjjzbi9-python3.13-pyvista-0.46.0/lib/python3.13/site-packages/pyvista/_deprecate_positional_args.py:191(inner_f)
+        1    0.334    0.334    0.433    0.433 /home/lj/projects/wave_map/src/wave_map/simulator/mesh.py:367(_compute_face_node_mappings)
+    14500    0.121    0.000    0.399    0.000 /home/lj/projects/wave_map/src/wave_map/simulator/spatial_evaluator.py:46(_map_to_reference_tetrahedron)
+    14500    0.215    0.000    0.381    0.000 /nix/store/kvwrragmjjb2i0ds5xvdvg0qlkkk1860-gmsh-4.14.0/lib/python3.13/site-packages/gmsh.py:2855(getElementByCoordinates)
+   145020    0.265    0.000    0.365    0.000 /home/lj/projects/wave_map/src/wave_map/simulator/finite_elements.py:342(_rst_to_abc)
+        2    0.000    0.000    0.295    0.147 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_manager.py:210(_save_image)
+        2    0.000    0.000    0.293    0.147 /home/lj/projects/wave_map/src/wave_map/simulator/visualizer.py:522(save)
+    30000    0.176    0.000    0.279    0.000 /nix/store/y6r8p8dc030rqxxjjp676p1ix2vv3nk0-python3.13-numpy-2.3.1/lib/python3.13/site-packages/numpy/_core/einsumfunc.py:553(_parse_einsum_input)
+        1    0.000    0.000    0.269    0.269 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_manager.py:13(__init__)
+        1    0.000    0.000    0.264    0.264 /home/lj/projects/wave_map/src/wave_map/simulator/visualizer.py:8(__init__)
+    14501    0.108    0.000    0.247    0.000 /nix/store/y6r8p8dc030rqxxjjp676p1ix2vv3nk0-python3.13-numpy-2.3.1/lib/python3.13/site-packages/numpy/linalg/_linalg.py:382(solve)
+  708/277    0.011    0.000    0.216    0.001 /nix/store/g6wibm1x0gzib5v59xc69zmrzdjjzbi9-python3.13-pyvista-0.46.0/lib/python3.13/site-packages/pyvista/core/utilities/misc.py:288(__call__)
+   870353    0.198    0.000    0.198    0.000 {built-in method numpy.zeros}
+        3    0.165    0.055    0.185    0.062 /nix/store/g6wibm1x0gzib5v59xc69zmrzdjjzbi9-python3.13-pyvista-0.46.0/lib/python3.13/site-packages/pyvista/plotting/plotter.py:6854(__init__)
+        2    0.000    0.000    0.169    0.085 /nix/store/g6wibm1x0gzib5v59xc69zmrzdjjzbi9-python3.13-pyvista-0.46.0/lib/python3.13/site-packages/pyvista/plotting/plotter.py:6237(screenshot)
+     1000    0.014    0.000    0.156    0.000 /home/lj/projects/wave_map/src/wave_map/simulator/simulation_manager.py:270(_log_info)
+    14514    0.022    0.000    0.145    0.000 /nix/store/kvwrragmjjb2i0ds5xvdvg0qlkkk1860-gmsh-4.14.0/lib/python3.13/site-packages/gmsh.py:134(_ovectorsize)
+     1040    0.140    0.000    0.140    0.000 {method 'write' of '_io.TextIOWrapper' objects}
+1247181/1247120    0.131    0.000    0.131    0.000 {built-in method builtins.len}
+    91/12    0.000    0.000    0.113    0.009 <frozen importlib._bootstrap>:1349(_find_and_load)
+    90/11    0.000    0.000    0.112    0.010 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+   182/12    0.000    0.000    0.105    0.009 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+     80/5    0.000    0.000    0.104    0.021 <frozen importlib._bootstrap>:911(_load_unlocked)
+    30000    0.074    0.000    0.104    0.000 /nix/store/y6r8p8dc030rqxxjjp676p1ix2vv3nk0-python3.13-numpy-2.3.1/lib/python3.13/site-packages/numpy/_core/einsumfunc.py:443(_can_dot)
+     62/5    0.000    0.000    0.104    0.021 <frozen importlib._bootstrap_external>:1020(exec_module)
+     62/5    0.000    0.000    0.103    0.021 {built-in method builtins.exec}
+       79    0.000    0.000    0.102    0.001 /nix/store/g6wibm1x0gzib5v59xc69zmrzdjjzbi9-python3.13-pyvista-0.46.0/lib/python3.13/site-packages/pyvista/__init__.py:95(__getattr__)
+        1    0.000    0.000    0.101    0.101 /nix/store/g6wibm1x0gzib5v59xc69zmrzdjjzbi9-python3.13-pyvista-0.46.0/lib/python3.13/site-packages/pyvista/plotting/__init__.py:1(<module>)
+    14522    0.023    0.000    0.097    0.000 /nix/store/y6r8p8dc030rqxxjjp676p1ix2vv3nk0-python3.13-numpy-2.3.1/lib/python3.13/site-packages/numpy/ctypeslib/_ctypeslib.py:520(as_array)
+
+
