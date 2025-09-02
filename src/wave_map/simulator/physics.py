@@ -142,7 +142,7 @@ class LinearAcoustics:
         f = self.source_frequency
         a = self.source_amplitude
         t0 = self.source_duration / 2  # center time
-        sigma = t0 / 5  # related to frequency; adjust if needed
+        sigma = t0 / 4  # related to frequency; adjust if needed
         pulse = np.exp(-((time - t0)**2 / (2 * sigma**2)))
         return a * pulse
 
@@ -391,14 +391,10 @@ class LinearAcoustics:
         page 6/14
         """
         # use stored fields in first RK time step iteration
-        if u is None:
-            u = self.u
-        if v is None:
-            v = self.v
-        if w is None:
-            w = self.w
-        if p is None:
-            p = self.p
+        if u is None: u = self.u
+        if v is None: v = self.v
+        if w is None: w = self.w
+        if p is None: p = self.p
 
         # get heterogeneous material matrices
         #self._get_material_face_values()

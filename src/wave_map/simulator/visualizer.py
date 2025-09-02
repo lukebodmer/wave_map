@@ -637,7 +637,7 @@ class Visualizer:
     
         fig, ax = plt.subplots(figsize=(12, 12))
         #vmax = np.abs(data_matrix).max()
-        vmax = 0.200
+        vmax = 0.100
         vmin = -vmax
 
         cax = ax.imshow(data_matrix, aspect='auto', cmap='seismic', origin='lower', vmin=vmin, vmax=vmax)
