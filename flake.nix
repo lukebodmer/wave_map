@@ -10,12 +10,17 @@
   outputs = { self, nixpkgs, custom-nixpkgs, ... }:
     let
       system = "x86_64-linux";
-      ## Import nixpkgs:
 
+      ## Import nixpkgs:
       pkgs = import nixpkgs {
         inherit system;
         overlays = [ custom-nixpkgs.overlays.default ];
+	config.allowUnfree = true;
       };
+
+      ## Choose a specific Python version for all packages
+      python = pkgs.python312;
+      pythonPackages = python.pkgs;
 
       ## Read pyproject.toml file:
       pyproject = builtins.fromTOML (builtins.readFile ./pyproject.toml);
@@ -24,7 +29,7 @@
       project = pyproject.project;
 
       ## Get the wave_map package:
-      package = pkgs.python3Packages.buildPythonPackage {
+      package = pythonPackages.buildPythonPackage {
         ## Set the package name:
         pname = project.name;
 
@@ -38,27 +43,30 @@
         src = ./.;
 
         ## Specify the build system to use:
-        build-system = with pkgs.python3Packages; [
+        build-system = with pythonPackages; [
           setuptools
         ];
+
         ## Specify production dependencies:
         propagatedBuildInputs = [
-          pkgs.python3.pkgs.cppimport
-          pkgs.python3Packages.distutils
-          pkgs.python3Packages.gmsh
-          pkgs.python3Packages.numpy
-          pkgs.python3Packages.pyvista
-          pkgs.python3Packages.panel
-          pkgs.python3Packages.scipy
-          pkgs.python3Packages.sklearn-compat
-          pkgs.python3Packages.tomli
-          pkgs.python3Packages.toml
+          #pkgs.cudatoolkit
+          #pkgs.python3.pkgs.cppimport
+          pythonPackages.distutils
+          pythonPackages.gmsh
+          #pythonPackages.numpy
+          pythonPackages.cupy
+          pythonPackages.pyvista
+          pythonPackages.panel
+          pythonPackages.scipy
+          pythonPackages.sklearn-compat
+          pythonPackages.tomli
+          pythonPackages.toml
         ];
 
       };
 
       ## Make our package editable:
-      editablePackage = pkgs.python3.pkgs.mkPythonEditablePackage {
+      editablePackage = pythonPackages.mkPythonEditablePackage {
         pname = project.name;
         inherit (project) scripts version;
         root = "$PWD/src";
@@ -83,10 +91,17 @@
               # my package
               editablePackage
 
-	      # tools
-              pkgs.python3Packages.python-lsp-server
+	      pkgs.cudatoolkit
+
+              # tools
+              pythonPackages.python-lsp-server
+              pythonPackages.flake8
             ];
 
+            shellHook = ''
+              export LD_LIBRARY_PATH="${pkgs.cudatoolkit}/lib:$LD_LIBRARY_PATH"
+              echo "Entering Python development shell with CuPy."
+            '';
           };
       };
 }

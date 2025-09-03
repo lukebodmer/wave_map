@@ -179,6 +179,10 @@ class UserInterface:
             self.status_text.object = "<span style='color:red'>⚠️ Load data before showing 3D.</span>"
             return
         try:
+            # Check if we're working with GPU data and inform user
+            if hasattr(self.visualizer.mesh, 'x') and hasattr(self.visualizer.mesh.x, 'get'):
+                self.status_text.object = "<span style='color:blue'>ℹ️ Preparing GPU data for 3D visualization...</span>"
+            
             self.visualizer.add_nodes_3d("p")
             self.visualizer._show_grid()
             self.visualizer.add_inclusion_boundary()
@@ -186,6 +190,9 @@ class UserInterface:
             self.visualizer.show()
             self.status_text.object = "<span style='color:green'>✅ 3D view launched.</span>"
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"3D visualization error details: {error_details}")
             self.status_text.object = f"<span style='color:red'>❌ Error in 3D view: {e}</span>"
 
     def _load_frame(self, event=None):
@@ -201,13 +208,27 @@ class UserInterface:
 
             mesh_path = data['mesh_directory'] / "mesh.pkl"
             if mesh_path.exists():
-                with open(mesh_path, 'rb') as mf:
-                    mesh_data = pickle.load(mf)
+                try:
+                    with open(mesh_path, 'rb') as mf:
+                        mesh_data = pickle.load(mf)
+                    
+                    # Check if mesh_data is a Mesh3d object and has CuPy arrays
+                    if hasattr(mesh_data, 'x') and hasattr(mesh_data.x, 'get'):
+                        self.status_text.object = "<span style='color:blue'>ℹ️ GPU mesh detected - transferring data to CPU for visualization...</span>"
+                        # The Visualizer class already handles CuPy->NumPy conversion internally
+                        
+                except Exception as e:
+                    self.status_text.object = f"<span style='color:red'>❌ Error loading mesh: {e}</span>"
+                    return
             else:
                 self.status_text.object = "<span style='color:red'>❌ mesh.pkl not found.</span>"
                 return
 
-            self.visualizer = Visualizer(mesh_data, data)
+            try:
+                self.visualizer = Visualizer(mesh_data, data)
+            except Exception as e:
+                self.status_text.object = f"<span style='color:red'>❌ Error creating visualizer: {e}</span>"
+                return
             tracked_fig = self.visualizer.plot_sensor_data_as_matrix()
             #tracked_fig = self.visualizer.plot_tracked_points()
 

@@ -2,7 +2,8 @@ import sys
 import math
 import pickle
 import time
-import numpy as np
+#import numpy as np
+import cupy as np
 from logging import getLogger
 from wave_map.simulator.time_steppers import LowStorageRungeKutta
 from wave_map.simulator.visualizer import Visualizer
@@ -72,6 +73,10 @@ class SimulationManager:
                                       self.save_points_interval)
         self.column_index = 0
         self.tracked_fields = {}
+        
+        # Precompute sensor metadata for GPU optimization
+        self._precompute_sensor_data(pressure, x, y, z)
+        
         if pressure:
             self.tracked_fields["pressure"] = {
                 "points": pressure,
@@ -223,15 +228,58 @@ class SimulationManager:
             pickle.dump(pressure_data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def _evaluate_sensor_data(self):
+        # GPU-optimized: evaluate all fields simultaneously
+        field_arrays = []
+        field_names = []
+        data_arrays = []
+        
         for name, field in self.tracked_fields.items():
-            values = field["data"]
-            points = field["points"]
-            field_array = getattr(self.physics, field["field_name"])
-
-            for i, (x, y, z) in enumerate(points):
-                values[i, self.column_index] = self.spatial_evaluator.eval_at_point(x, y, z, field_array)
-
+            field_arrays.append(getattr(self.physics, field["field_name"]))
+            field_names.append(name)
+            data_arrays.append(field["data"])
+        
+        if field_arrays:
+            # Vectorized evaluation across all fields and sensors
+            results = self.spatial_evaluator.eval_sensors_gpu_optimized(
+                field_arrays, self.sensor_metadata
+            )
+            
+            # Efficiently update all data arrays
+            for i, (name, data_array) in enumerate(zip(field_names, data_arrays)):
+                data_array[:, self.column_index] = results[i]
+        
         self.column_index += 1
+    
+    def _precompute_sensor_data(self, pressure=None, x=None, y=None, z=None):
+        """Precompute sensor metadata for GPU-optimized evaluation."""
+        all_points = []
+        field_indices = {}
+        
+        current_idx = 0
+        if pressure:
+            field_indices["pressure"] = (current_idx, current_idx + len(pressure))
+            all_points.extend(pressure)
+            current_idx += len(pressure)
+        if x:
+            field_indices["x"] = (current_idx, current_idx + len(x))
+            all_points.extend(x)
+            current_idx += len(x)
+        if y:
+            field_indices["y"] = (current_idx, current_idx + len(y))
+            all_points.extend(y)
+            current_idx += len(y)
+        if z:
+            field_indices["z"] = (current_idx, current_idx + len(z))
+            all_points.extend(z)
+            current_idx += len(z)
+        
+        # Precompute element lookups and coordinate transforms (CPU-heavy operations)
+        if all_points:
+            self.sensor_metadata = self.spatial_evaluator.precompute_sensor_metadata(
+                all_points, field_indices
+            )
+        else:
+            self.sensor_metadata = None
 
     def _save_energy(self):
         # on page 37 in Hesthaven and warburton we see how the mass matrix can be
@@ -250,14 +298,17 @@ class SimulationManager:
         inv_bulk = 1.0 / (rho * (c**2))  # shape (Np, K
 
         # potential energy: (1/2) * p^2 / (rho * c^2)
-        potential = np.array([p[:, i].T @ mass @ p[:, i] for i in range(num_cells)])
+        mass = np.asarray(mass)  # Ensure mass matrix is a cupy array
+        # Vectorized computation: p.T @ mass @ p for all cells at once
+        potential = np.einsum('ij,jk,ki->i', p.T, mass, p)
         potential = 0.5 * inv_bulk * j * potential
         self.potential_data[self.energy_index] = np.sum(potential)
 
         # kinetic energy: (1/2) * rho * (u^2 + v^2 + w^2)
-        kinetic_u = np.array([u[:, i].T @ mass @ u[:, i] for i in range(num_cells)])
-        kinetic_v = np.array([v[:, i].T @ mass @ v[:, i] for i in range(num_cells)])
-        kinetic_w = np.array([w[:, i].T @ mass @ w[:, i] for i in range(num_cells)])
+        # Vectorized computation: u.T @ mass @ u for all cells at once
+        kinetic_u = np.einsum('ij,jk,ki->i', u.T, mass, u)
+        kinetic_v = np.einsum('ij,jk,ki->i', v.T, mass, v)
+        kinetic_w = np.einsum('ij,jk,ki->i', w.T, mass, w)
         kinetic = (0.5 * rho * j * (kinetic_u + kinetic_v + kinetic_w))
         self.kinetic_data[self.energy_index] = np.sum(kinetic)
 

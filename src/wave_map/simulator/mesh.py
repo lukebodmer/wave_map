@@ -1,4 +1,5 @@
 import numpy as np
+import cupy as cp
 import gmsh
 from logging import getLogger
 from wave_map.simulator.reference_element_operators import ReferenceElementOperators
@@ -100,16 +101,31 @@ class Mesh3d:
        # self.jacobians = {}
        # #self.determinants = {}
        
+        logger = getLogger("simlog")
+        
+        logger.info("... Extracting mesh info")
         self._extract_mesh_info()
+        logger.info("... Getting material info")
         self._get_material_info()
+        logger.info("... Getting smallest diameter")
         self._get_smallest_diameter()
+        logger.info("... Building connectivity matrices")
         self._build_connectivityMatricies()
+        logger.info("... Getting mapped nodal coordinates")
         self._get_mapped_nodal_cordinates()
+        logger.info("... Computing mapping coefficients")
         self._compute_mapping_coefficients()
+        logger.info("... Computing normals at face nodes")
         self._compute_normals_at_face_nodes()
+        logger.info("... Computing face node mappings")
         self._compute_face_node_mappings()
+        logger.info("... Finding boundary nodes")
         self._find_boundary_nodes()
+        logger.info("... Computing surface to volume jacobian")
         self._compute_surface_to_volume_jacobian()
+        logger.info("... Transferring arrays to GPU")
+        self._transfer_to_gpu()
+        logger.info("... Logging mesh info")
         self.log_info()
 
     def open_gmsh_file(self):
@@ -123,7 +139,7 @@ class Mesh3d:
         """ Get information from Gmsh file """
         # get vertex information 
         ntags, coords, _ = gmsh.model.mesh.getNodes(4)
-        self.num_vertices= len(ntags)
+        self.num_vertices = len(ntags)
         self.vertex_coordinates = coords.reshape(-1, 3)
         self.x_vertex = self.vertex_coordinates[:, 0]
         self.y_vertex = self.vertex_coordinates[:, 1]
@@ -431,6 +447,53 @@ class Mesh3d:
         face_node_indices = self.reference_element.face_node_indices
         J = self.jacobians
         self.surface_to_volume_jacobian = sJ / J[face_node_indices, :]
+
+    def _transfer_to_gpu(self):
+        """Transfer all NumPy arrays to GPU using CuPy"""
+        # Geometric arrays
+        self.vertex_coordinates = cp.asarray(self.vertex_coordinates)
+        self.x_vertex = cp.asarray(self.x_vertex)
+        self.y_vertex = cp.asarray(self.y_vertex)
+        self.z_vertex = cp.asarray(self.z_vertex)
+        self.x = cp.asarray(self.x)
+        self.y = cp.asarray(self.y)
+        self.z = cp.asarray(self.z)
+        
+        # Connectivity arrays
+        self.cell_to_vertices = cp.asarray(self.cell_to_vertices)
+        self.cell_to_cells = cp.asarray(self.cell_to_cells)
+        self.cell_to_faces = cp.asarray(self.cell_to_faces)
+        
+        # Material properties
+        self.speed = cp.asarray(self.speed)
+        self.density = cp.asarray(self.density)
+        
+        # Jacobian and mapping coefficients
+        self.jacobians = cp.asarray(self.jacobians)
+        self.drdx = cp.asarray(self.drdx)
+        self.drdy = cp.asarray(self.drdy)
+        self.drdz = cp.asarray(self.drdz)
+        self.dsdx = cp.asarray(self.dsdx)
+        self.dsdy = cp.asarray(self.dsdy)
+        self.dsdz = cp.asarray(self.dsdz)
+        self.dtdx = cp.asarray(self.dtdx)
+        self.dtdy = cp.asarray(self.dtdy)
+        self.dtdz = cp.asarray(self.dtdz)
+        
+        # Normal vectors and surface jacobians
+        self.nx = cp.asarray(self.nx)
+        self.ny = cp.asarray(self.ny)
+        self.nz = cp.asarray(self.nz)
+        self.surface_jacobians = cp.asarray(self.surface_jacobians)
+        
+        # Face node mappings
+        self.interior_face_node_indices = cp.asarray(self.interior_face_node_indices)
+        self.exterior_face_node_indices = cp.asarray(self.exterior_face_node_indices)
+        self.boundary_face_node_indices = cp.asarray(self.boundary_face_node_indices)
+        self.boundary_node_indices = cp.asarray(self.boundary_node_indices)
+        
+        # Surface to volume jacobian
+        self.surface_to_volume_jacobian = cp.asarray(self.surface_to_volume_jacobian)
 
     def get_edges(self):
         # get edges

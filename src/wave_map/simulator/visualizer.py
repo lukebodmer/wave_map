@@ -1,4 +1,5 @@
-import numpy as np
+#import numpy as np
+import cupy as cp
 import pyvista as pv
 import panel as pn
 import matplotlib.pyplot as plt
@@ -18,6 +19,12 @@ class Visualizer:
 
         # set camera
         self.set_camera()
+    
+    def _to_cpu(self, array):
+        """Convert CuPy array to NumPy array for PyVista compatibility"""
+        if hasattr(array, 'get'):  # CuPy array
+            return array.get()
+        return array  # Already NumPy array
 
     def set_data(self, mesh_data, data):
         self.data = data
@@ -26,30 +33,51 @@ class Visualizer:
         self.plotter.clear()
 
     def extract_data(self, data):
-        self.x = self.mesh["x"]
-        self.y = self.mesh["y"]
-        self.z = self.mesh["z"]
-        self.nx = self.mesh["nx"]
-        self.ny = self.mesh["ny"]
-        self.nz = self.mesh["nz"]
-        self.num_cells = self.mesh["num_cells"]
+        # Check if mesh is the new Mesh3d object or old dictionary format
+        if hasattr(self.mesh, 'x'):  # New Mesh3d object
+            self.x = self.mesh.x
+            self.y = self.mesh.y
+            self.z = self.mesh.z
+            self.nx = self.mesh.nx
+            self.ny = self.mesh.ny
+            self.nz = self.mesh.nz
+            self.num_cells = self.mesh.num_cells
+            self.speed = self.mesh.speed[0, :]  # Take first row as speed per cell
+            self.interior_face_node_indices = self.mesh.interior_face_node_indices
+            self.boundary_node_indices = self.mesh.boundary_node_indices
+            self.jacobians = self.mesh.jacobians[0, :]  # Take first row as jacobian per cell
+            self.inclusion_center = self.mesh.inclusion_center
+            self.inclusion_scaling = self.mesh.inclusion_scaling
+            self.inclusion_semi_major_axis_direction = self.mesh.inclusion_semi_major_axis_direction
+            self.vertex_coordinates = self.mesh.vertex_coordinates
+            self.cell_to_vertices = self.mesh.cell_to_vertices
+            self.face_node_indices = self.mesh.reference_element.face_node_indices
+            self.boundary_face_node_indices = self.mesh.boundary_face_node_indices
+        else:  # Old dictionary format
+            self.x = self.mesh["x"]
+            self.y = self.mesh["y"]
+            self.z = self.mesh["z"]
+            self.nx = self.mesh["nx"]
+            self.ny = self.mesh["ny"]
+            self.nz = self.mesh["nz"]
+            self.num_cells = self.mesh["num_cells"]
+            self.speed = self.mesh["speed_per_cell"]
+            self.interior_face_node_indices = self.mesh["interior_face_node_indices"]
+            self.boundary_node_indices = self.mesh["boundary_node_indices"]
+            self.jacobians = self.mesh["cell_jacobians"]
+            self.inclusion_center = self.mesh["inclusion_center"]
+            self.inclusion_scaling = self.mesh["inclusion_scaling"]
+            self.inclusion_semi_major_axis_direction = self.mesh["inclusion_semi_major_axis_direction"]
+            self.vertex_coordinates = self.mesh["vertex_coordinates"]
+            self.cell_to_vertices = self.mesh["cell_to_vertices"]
+            self.face_node_indices = self.mesh["reference_element"].face_node_indices
+            self.boundary_face_node_indices = self.mesh["boundary_face_node_indices"]
+        
         self.fields = data["fields"]
         self.p = self.fields["p"]
         self.u = self.fields["u"]
         self.v = self.fields["v"]
         self.w = self.fields["w"]
-        self.speed = self.mesh["speed_per_cell"]
-        self.interior_face_node_indices = self.mesh["interior_face_node_indices"]
-        self.boundary_node_indices = self.mesh["boundary_node_indices"]
-        self.jacobians = self.mesh["cell_jacobians"]
-        self.inclusion_center = self.mesh["inclusion_center"]
-        self.inclusion_scaling = self.mesh["inclusion_scaling"]
-        self.inclusion_semi_major_axis_direction = self.mesh["inclusion_semi_major_axis_direction"]
-
-        self.vertex_coordinates = self.mesh["vertex_coordinates"]
-        self.cell_to_vertices = self.mesh["cell_to_vertices"]
-        self.face_node_indices = self.mesh["reference_element"].face_node_indices
-        self.boundary_face_node_indices = self.mesh["boundary_face_node_indices"]
 
         self.tracked_fields = data.get("simulator", {}).get("tracked_fields", {})
         self.energy_data = data.get("simulator", {}).get("energy_data", [])
@@ -71,15 +99,22 @@ class Visualizer:
         self.get_domain_parameters()
 
     def get_domain_parameters(self):
-        # get minimum coordinate values
-        self.x_min = np.min(self.x)
-        self.y_min = np.min(self.y)
-        self.z_min = np.min(self.z)
-
-        # get maximum coordinate values
-        self.x_max = np.max(self.x)
-        self.y_max = np.max(self.y)
-        self.z_max = np.max(self.z)
+        # get minimum coordinate values (handle both CuPy and NumPy)
+        if hasattr(self.x, 'get'):  # CuPy array
+            self.x_min = cp.min(self.x)
+            self.y_min = cp.min(self.y)
+            self.z_min = cp.min(self.z)
+            self.x_max = cp.max(self.x)
+            self.y_max = cp.max(self.y)
+            self.z_max = cp.max(self.z)
+        else:  # NumPy array
+            import numpy as np
+            self.x_min = np.min(self.x)
+            self.y_min = np.min(self.y)
+            self.z_min = np.min(self.z)
+            self.x_max = np.max(self.x)
+            self.y_max = np.max(self.y)
+            self.z_max = np.max(self.z)
 
     def set_camera(self):
         camera_position = [
@@ -96,30 +131,44 @@ class Visualizer:
 
     def add_nodes_3d(self, field):
         """Plot nodes on the mesh with colors and opacity based on solution values."""
+        import numpy as np
+        
         # Extract x, y, z coordinates for the nodes
-        x = self.x.ravel(order='F')
-        y = self.y.ravel(order='F')
-        z = self.z.ravel(order='F')
+        x = self._to_cpu(self.x.ravel(order='F'))
+        y = self._to_cpu(self.y.ravel(order='F'))
+        z = self._to_cpu(self.z.ravel(order='F'))
+        
+        # Debug: Check if coordinates are valid
+        if len(x) == 0 or len(y) == 0 or len(z) == 0:
+            raise ValueError(f"Empty coordinate arrays: x={len(x)}, y={len(y)}, z={len(z)}")
         
         # Stack into nodal points
         node_coordinates = np.column_stack((x, y, z))
         
+        # Debug: Check if node_coordinates is valid
+        if node_coordinates.size == 0:
+            raise ValueError("Empty node_coordinates array")
+        
         # Flatten the solution matrix to align with the coordinates
-        field = np.ravel(self.fields[field], order='F')
+        field_data = self._to_cpu(self.fields[field]).ravel(order='F')
+        
+        # Debug: Check field data
+        if len(field_data) == 0:
+            raise ValueError(f"Empty field data for field '{field}'")
         #field[self.mesh.exterior_face_node_indices] = 0
-        #opacity = np.abs(field)
+        #opacity = cp.abs(field)
 
         # Add the points to the plot with colors and opacity
         self.plotter.add_points(
             node_coordinates,
-            scalars=field,
+            scalars=field_data,
             cmap="seismic",
             #opacity='linear',
             #opacity=opacity,
             opacity=[0.9, 0.7, 0.5, 0.5, 0, 0.5, 0.5, 0.7, 0.9],
             #opacity=[0.01, 0.05, 0.06,  0.08, 0.09, 0.2, 0.3],
             #clim=[-.00001,.00001],
-            clim=[-.10,.10],
+            clim=[-0.800, 0.800],
             point_size=10,
             render_points_as_spheres=True
         )
@@ -138,7 +187,7 @@ class Visualizer:
         z = z[nodes]
 
         # Stack into nodal points
-        node_coordinates = np.column_stack((x, y, z))
+        node_coordinates = cp.column_stack((x, y, z))
 
         # Add the points to the plot
         self.plotter.add_points(
@@ -154,7 +203,7 @@ class Visualizer:
         z = self.z[:, cell_list].flatten()
         
         # Stack into nodal points
-        node_coordinates = np.column_stack((x, y, z))
+        node_coordinates = cp.column_stack((x, y, z))
         
         # Add the points to the plot
         self.plotter.add_points(
@@ -167,12 +216,13 @@ class Visualizer:
     def add_all_boundary_nodes(self):
         """Plot boundary nodes on the mesh."""
         # Extract x, y, z coordinates for the boundary nodes
-        boundary_nodes = self.boundary_node_indices
-        x = self.x.ravel(order="F")[boundary_nodes]
-        y = self.y.ravel(order="F")[boundary_nodes]
-        z = self.z.ravel(order="F")[boundary_nodes]
+        boundary_nodes = self._to_cpu(self.boundary_node_indices)
+        x = self._to_cpu(self.x.ravel(order="F"))[boundary_nodes]
+        y = self._to_cpu(self.y.ravel(order="F"))[boundary_nodes]
+        z = self._to_cpu(self.z.ravel(order="F"))[boundary_nodes]
         
         # Stack into boundary nodal points
+        import numpy as np
         boundary_points_to_plot = np.column_stack((x, y, z))
         
         # Add the boundary points to the plot
@@ -186,8 +236,10 @@ class Visualizer:
 
     def add_cells(self, cell_list):
         """Highlight specific cells on the mesh."""
+        import numpy as np
+        
         # Get Jacobian values for all cells (using first element of each column)
-        jacobian_values = self.jacobians
+        jacobian_values = self._to_cpu(self.jacobians)
             
         # Normalize Jacobian values to create a color map
         cmap = plt.cm.viridis  # You can choose any colormap
@@ -201,10 +253,13 @@ class Visualizer:
             color = cmap(norm(jacobian_value))[:3]  # Use only the RGB channels
                 
             # Create the mesh for the highlighted cell
+            cell_to_vertices_cpu = self._to_cpu(self.cell_to_vertices)
+            vertex_coordinates_cpu = self._to_cpu(self.vertex_coordinates)
+            
             cell_mesh = pv.UnstructuredGrid(
-                np.hstack([[4], self.cell_to_vertices[cell]]).flatten(),
+                np.hstack([[4], cell_to_vertices_cpu[cell]]).flatten(),
                 [pv.CellType.TETRA],
-                self.vertex_coordinates
+                vertex_coordinates_cpu
             )
                 
             # Apply color based on the Jacobian value
@@ -221,6 +276,7 @@ class Visualizer:
             return
 
         # Convert list of coordinates to numpy array
+        import numpy as np
         sensor_points = np.array(self.sensor_coordinates)
 
         # Add the points to the plot as red spheres
@@ -239,7 +295,7 @@ class Visualizer:
             z_origin = self.z[:, cell][face_node_indices].ravel(order='F')
             
             # Stack into origin points
-            normal_vector_origin = np.column_stack((x_origin, y_origin, z_origin))
+            normal_vector_origin = cp.column_stack((x_origin, y_origin, z_origin))
             
             # Extract normal vectors for the given element
             nx = self.mesh.nx[:, cell]
@@ -247,7 +303,7 @@ class Visualizer:
             nz = self.mesh.nz[:, cell]
             
             # Stack into normal vectors
-            normal_vector_direction = np.column_stack((nx, ny, nz))
+            normal_vector_direction = cp.column_stack((nx, ny, nz))
             
             # Add normal vectors as arrows
             self.plotter.add_arrows(
@@ -268,7 +324,7 @@ class Visualizer:
         y_origin = self.y.ravel(order='F')[boundary_node_indices]
         z_origin = self.z.ravel(order='F')[boundary_node_indices]
         
-        normal_vector_origin = np.column_stack((x_origin, y_origin, z_origin))
+        normal_vector_origin = cp.column_stack((x_origin, y_origin, z_origin))
 
         # Extract normal vectors for the given element
         nx = self.nx.ravel(order='F')[boundary_face_node_indices]
@@ -276,7 +332,7 @@ class Visualizer:
         nz = self.nz.ravel(order='F')[boundary_face_node_indices]
         
         # Stack into normal vectors
-        normal_vector_direction = np.column_stack((nx, ny, nz))
+        normal_vector_direction = cp.column_stack((nx, ny, nz))
     
         self.plotter.add_arrows(
             normal_vector_origin,
@@ -291,6 +347,8 @@ class Visualizer:
         Plot cell averages for a given solution.
         Each cell's average solution value is computed and visualized.
         """
+        import numpy as np
+        
         # Construct a cells object to make a pyvista unstructuredGrid
         cells = np.zeros(self.num_cells * 5, dtype='int')
         index = 0
@@ -302,11 +360,16 @@ class Visualizer:
                 index += 1
     
         # calculate average of each cell
-        cell_averages = np.mean(field, axis=0)
+        if hasattr(field, 'get'):  # CuPy array
+            field_cpu = field.get()
+            cell_averages = np.mean(field_cpu, axis=0)
+        else:  # NumPy array
+            cell_averages = np.mean(field, axis=0)
+            
         # designate cell type of tetrahedron
         cell_types = np.repeat(np.array([pv.CellType.TETRA]), self.num_cells)
         # get coordinates from mesh
-        coordinates = self.vertex_coordinates[self.cell_to_vertices.ravel()]
+        coordinates = self._to_cpu(self.vertex_coordinates)[self._to_cpu(self.cell_to_vertices).ravel()]
 
         # create unstructured grid
         grid = pv.UnstructuredGrid(
@@ -319,7 +382,7 @@ class Visualizer:
         self.plotter.add_mesh(
             grid,
             scalars=cell_averages,
-            #opacity=np.abs(cell_averages),
+            #opacity=cp.abs(cell_averages),
             #opacity=[0.9, 0.7, 0.5, 0.5,0.3, 0, 0.3, 0.5, 0.5, 0.7, 0.9],
             #opacity=[0.9, 0.7, 0.5,  0, 0.5, 0.7, 0.9],
             opacity=[0.01, 0.05, 0.06,  0.08, 0.09, 0.2, 0.3],
@@ -332,7 +395,7 @@ class Visualizer:
     def add_wave_speed(self):
         """ plot the wavespeed of each element """
         # Construct a cells object to make a pyvista unstructuredGrid
-        cells = np.zeros(self.num_cells * 5, dtype='int')
+        cells = cp.zeros(self.num_cells * 5, dtype='int')
         index = 0
         for i in range(self.num_cells * 5):
             if i % 5 == 0:
@@ -340,7 +403,7 @@ class Visualizer:
             else:
                 cells[i] = index
                 index += 1
-        cell_types = np.repeat(np.array([pv.CellType.TETRA]), self.num_cells)
+        cell_types = cp.repeat(cp.array([pv.CellType.TETRA]), self.num_cells)
         points = self.vertex_coordinates[self.cell_to_vertices.ravel()]
     
         # create a pyvista unstructured grid
@@ -360,7 +423,7 @@ class Visualizer:
     def add_mesh(self):
         """Add the edges of the entire 3D mesh as translucent wireframe."""
         # Construct a cells object to make a pyvista unstructuredGrid
-        cells = np.zeros(self.num_cells * 5, dtype='int')
+        cells = cp.zeros(self.num_cells * 5, dtype='int')
         index = 0
         for i in range(self.num_cells * 5):
             if i % 5 == 0:
@@ -369,7 +432,7 @@ class Visualizer:
                 cells[i] = index
                 index += 1
     
-        cell_types = np.repeat(np.array([pv.CellType.TETRA]), self.num_cells)
+        cell_types = cp.repeat(cp.array([pv.CellType.TETRA]), self.num_cells)
         points = self.vertex_coordinates[self.cell_to_vertices.ravel()]
     
         # create a pyvista unstructured grid
@@ -405,8 +468,8 @@ class Visualizer:
     def add_mesh_boundary(self):
         """ Plot mesh edges on boundary """
         # create cells and cell_types to pyvista unstructured grid
-        cells = np.hstack([np.full((self.num_cells, 1), 4), self.cell_to_vertices]).flatten()
-        cell_types = np.full(self.num_cells, pv.CellType.TETRA) 
+        cells = cp.hstack([cp.full((self.num_cells, 1), 4), self.cell_to_vertices]).flatten()
+        cell_types = cp.full(self.num_cells, pv.CellType.TETRA) 
 
         # create unstructured grid
         grid = pv.UnstructuredGrid(
@@ -441,8 +504,15 @@ class Visualizer:
 
     def plot_reference_nodes_3d(self):
         """ plot the nodes for the reference finite element """
-        # Get nodes
-        nodes = self.mesh["reference_element"].nodes
+        # Get nodes from either new Mesh3d object or old dictionary format
+        if hasattr(self.mesh, 'reference_element'):
+            nodes = self.mesh.reference_element.nodes
+            d = self.mesh.reference_element.d
+            n = self.mesh.reference_element.n
+        else:
+            nodes = self.mesh["reference_element"].nodes
+            d = self.mesh["reference_element"].d
+            n = self.mesh["reference_element"].n
         
         # Create a PyVista point cloud
         point_cloud = pv.PolyData(nodes)
@@ -462,13 +532,13 @@ class Visualizer:
         plotter.show_grid()
         
         # show plot
-        d = self.mesh["reference_element"].d
-        n = self.mesh["reference_element"].n
         plotter.show(title=f"Lagrange Element Nodes (d={d}, n={n})")
 
     def add_inclusion_boundary(self):
-        center = self.inclusion_center
-        scaling = self.inclusion_scaling
+        import numpy as np
+        
+        center = self._to_cpu(self.inclusion_center) if hasattr(self.inclusion_center, 'get') else self.inclusion_center
+        scaling = self._to_cpu(self.inclusion_scaling) if hasattr(self.inclusion_scaling, 'get') else self.inclusion_scaling
         axis_dir = np.array(self.inclusion_semi_major_axis_direction)
         axis_dir = axis_dir / np.linalg.norm(axis_dir)
 
@@ -545,6 +615,7 @@ class Visualizer:
             self.plotter = old_plotter
 
     def plot_energy(self, show=False):
+        import numpy as np
         #num_steps = len(self.energy_data)
         interval = self.save_energy_interval
         t = self.current_time_step
@@ -552,9 +623,9 @@ class Visualizer:
         num_steps = t // interval + 1
         time_array = np.arange(num_steps) * dt
         fig, ax = plt.subplots()
-        ax.plot(time_array, self.energy_data[:num_steps], marker='o', label='Total Energy')
-        ax.plot(time_array, self.kinetic_data[:num_steps], marker='x', label='KE')
-        ax.plot(time_array, self.potential_data[:num_steps], marker='*', label='PE')
+        ax.plot(time_array, self._to_cpu(self.energy_data[:num_steps]), marker='o', label='Total Energy')
+        ax.plot(time_array, self._to_cpu(self.kinetic_data[:num_steps]), marker='x', label='KE')
+        ax.plot(time_array, self._to_cpu(self.potential_data[:num_steps]), marker='*', label='PE')
         ax.legend()
         ax.set_title(f'Global Energy (reflective boundary conditions)')
         ax.set_ylabel('Energy')
@@ -580,6 +651,7 @@ class Visualizer:
         dt = self.dt
         t = self.current_time_step
         num_steps = t // interval  # only show data up to this step
+        import numpy as np
         time_array = np.arange(num_steps) * dt * interval
     
         color_map = {"pressure": "purple", "x": "blue", "y": "green", "z": "red"}
@@ -596,7 +668,7 @@ class Visualizer:
             color = color_map.get(field_key, "black")
             label = label_map.get(field_key, field_key)
             for point_idx, (x, y, z) in enumerate(entry["points"]):
-                data_series = entry["data"][point_idx][:num_steps]
+                data_series = self._to_cpu(entry["data"][point_idx][:num_steps])
                 ax = axes[plot_idx]
                 ax.plot(time_array, data_series, color=color, linewidth=1.5, marker='o', markersize=4, label=label)
                 # Add coordinates as horizontal text above the plot
@@ -631,8 +703,9 @@ class Visualizer:
         t = self.current_time_step
         num_steps = t // interval
     
+        import numpy as np
         pressure_entry = self.tracked_fields["pressure"]
-        data_matrix = pressure_entry["data"][:, :num_steps]  # (n_points, time)
+        data_matrix = self._to_cpu(pressure_entry["data"][:, :num_steps])  # (n_points, time)
         points = pressure_entry["points"]
     
         fig, ax = plt.subplots(figsize=(12, 12))
@@ -676,7 +749,7 @@ class Visualizer:
     def plot_source(self, source_data):
         num_steps = len(source_data)
         dt = self.time_stepper.dt
-        time_array = np.arange(num_steps) * dt
+        time_array = cp.arange(num_steps) * dt
         fig, ax = plt.subplots()
         ax.plot(time_array, source_data, marker='o', label='Source')
         ax.legend()

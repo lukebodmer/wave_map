@@ -1,4 +1,4 @@
-import numpy as np
+import cupy as np
 from wave_map.simulator.mesh import Mesh3d
 
 class LinearAcoustics:
@@ -10,7 +10,7 @@ class LinearAcoustics:
                  source_frequency=None,
                  ):
         self.mesh = mesh
-        self.lift = self.mesh.reference_element_operators.lift_matrix
+        self.lift = np.asarray(self.mesh.reference_element_operators.lift_matrix)
         self.face_scale = self.mesh.surface_to_volume_jacobian
         self.nodes_per_cell = self.mesh.reference_element.nodes_per_cell
         self.nodes_per_face = self.mesh.reference_element.nodes_per_face
@@ -22,7 +22,7 @@ class LinearAcoustics:
         self.w = np.zeros((self.nodes_per_cell, self.num_cells), order='F')
         self.source_center = np.array(source_center)
         self.source_radius = source_radius
-        self.source_frequency = source_frequency# Hz
+        self.source_frequency = source_frequency # Hz
         self.source_amplitude = source_amplitude
         self.source_duration = 1 / self.source_frequency
         self._locate_source_nodes()
@@ -39,9 +39,10 @@ class LinearAcoustics:
 
     def _precompute_spatial_derivatives(self):
         # precompute spatial derivative matrices
-        Dr = self.mesh.reference_element_operators.r_differentiation_matrix
-        Ds = self.mesh.reference_element_operators.s_differentiation_matrix
-        Dt = self.mesh.reference_element_operators.t_differentiation_matrix
+        # Convert NumPy arrays to CuPy
+        Dr = np.asarray(self.mesh.reference_element_operators.r_differentiation_matrix)
+        Ds = np.asarray(self.mesh.reference_element_operators.s_differentiation_matrix)
+        Dt = np.asarray(self.mesh.reference_element_operators.t_differentiation_matrix)
 
         self.Dx = np.empty((self.nodes_per_cell, self.nodes_per_cell, self.num_cells))
         self.Dy = np.empty((self.nodes_per_cell, self.nodes_per_cell, self.num_cells))
@@ -141,15 +142,16 @@ class LinearAcoustics:
     def _compute_gaussian_pulse(self, time):
         f = self.source_frequency
         a = self.source_amplitude
-        t0 = self.source_duration / 2  # center time
-        sigma = t0 / 4  # related to frequency; adjust if needed
+        t0 = 1 / (2 * f)
+        sigma = t0 / 4
         pulse = np.exp(-((time - t0)**2 / (2 * sigma**2)))
         return a * pulse
 
     def _compute_ricker_wavelet(self, time):
         f = self.source_frequency
         a = self.source_amplitude
-        t0 = self.source_duration / 2  # center the wavelet in the source duration
+        #t0 = self.source_duration / 2  # center the wavelet in the source duration
+        t0 = 1 / (2 * self.source_frequency)  # center the wavelet in the source duration
         tau = time - t0
         wavelet = (1 - 2 * (np.pi * f * tau)**2) * np.exp(-(np.pi * f * tau)**2)
         return a * wavelet
@@ -255,8 +257,8 @@ class LinearAcoustics:
         p_b = self._get_source_pressure(time)
     
         # If the pulse is over (or effectively zero), don't override reflecting BC
-        if np.isclose(p_b, 0.0, atol=1e-12):
-            return
+        #if np.isclose(p_b, 0.0, atol=1e-30):
+        #    return
 
         # Local impedance Z = rho * c (plus side)
         Z = self.rho_p.ravel('F')[src] * self.c_p.ravel('F')[src]

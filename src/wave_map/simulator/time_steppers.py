@@ -1,4 +1,4 @@
-import numpy as np
+import cupy as np
 from logging import getLogger
 from wave_map.simulator.physics import LinearAcoustics
 
