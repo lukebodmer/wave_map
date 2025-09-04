@@ -2,6 +2,7 @@ import pickle
 from pathlib import Path
 import toml
 import numpy as np
+import cupy as cp
 
 
 class FinalDataExtractor:
@@ -34,7 +35,7 @@ class FinalDataExtractor:
         processed = processed[:, 1:]
 
         # trim more timesteps from start
-        processed = processed[:, 200:]
+        processed = processed[:, 650:]
 
         # downsample
         processed = processed[:, ::self.downsample_factor]
@@ -68,6 +69,8 @@ class FinalDataExtractor:
                 with open(sensor_file, "rb") as f:
                     sensor_data = pickle.load(f)
 
+                # convert from cupy to numpy
+                sensor_data = cp.asnumpy(sensor_data)
                 # --- Post-process output ---
                 processed_output = self.post_process_output(sensor_data)
 

@@ -2,8 +2,8 @@ import sys
 import math
 import pickle
 import time
-#import numpy as np
-import cupy as np
+import numpy as np
+import cupy as cp
 from logging import getLogger
 from wave_map.simulator.time_steppers import LowStorageRungeKutta
 from wave_map.simulator.visualizer import Visualizer
@@ -28,7 +28,7 @@ class SimulationManager:
         self.physics = self.time_stepper.physics
         self.mesh = self.physics.mesh
         self.mesh_directory = mesh_directory
-        self.spatial_evaluator = SpatialEvaluator(self.mesh)
+        self.spatial_evaluator = SpatialEvaluator(self.mesh, pressure_reciever_locations)
         self.t_final = self.time_stepper.t_final
 
         self.save_image_interval = save_image_interval
@@ -36,6 +36,14 @@ class SimulationManager:
         self.save_points_interval = save_points_interval
         self.save_energy_interval = save_energy_interval
         self.start_time = 0
+
+        # Cache operators and material properties on GPU
+        self.mass_gpu = cp.asarray(self.mesh.reference_element_operators.mass_matrix, dtype=float)
+        self.j_gpu = cp.asarray(self.mesh.jacobians[0, :], dtype=float)          # shape (K,)
+        self.rho_gpu = cp.asarray(self.mesh.density[0, :], dtype=float)         # shape (Np,K)
+        self.c_gpu = cp.asarray(self.mesh.speed[0, :], dtype=float)             # shape (Np,K)
+        self.inv_bulk_gpu = 1.0 / (self.rho_gpu * (self.c_gpu ** 2))            # shape (Np,K)
+
 
         self.pressure_reciever_locations = pressure_reciever_locations
         self._get_sensor_information(
@@ -73,32 +81,28 @@ class SimulationManager:
                                       self.save_points_interval)
         self.column_index = 0
         self.tracked_fields = {}
-        
-        # Precompute sensor metadata for GPU optimization
-        self._precompute_sensor_data(pressure, x, y, z)
-        
         if pressure:
             self.tracked_fields["pressure"] = {
                 "points": pressure,
-                "data": np.zeros((len(pressure), self.num_readings)),
+                "data": cp.zeros((len(pressure), self.num_readings)),
                 "field_name": "p"
             }
         if x:
             self.tracked_fields["x"] = {
                 "points": x,
-                "data": np.zeros((len(x), self.num_readings)),
+                "data": cp.zeros((len(x), self.num_readings)),
                 "field_name": "u"
             }
         if y:
             self.tracked_fields["y"] = {
                 "points": y,
-                "data": np.zeros((len(y), self.num_readings)),
+                "data": cp.zeros((len(y), self.num_readings)),
                 "field_name": "v"
             }
         if z:
             self.tracked_fields["z"] = {
                 "points": z,
-                "data": np.zeros((len(z), self.num_readings)),
+                "data": cp.zeros((len(z), self.num_readings)),
                 "field_name": "w"
             }
 
@@ -228,92 +232,37 @@ class SimulationManager:
             pickle.dump(pressure_data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def _evaluate_sensor_data(self):
-        # GPU-optimized: evaluate all fields simultaneously
-        field_arrays = []
-        field_names = []
-        data_arrays = []
-        
+        # in _evaluate_sensor_data
         for name, field in self.tracked_fields.items():
-            field_arrays.append(getattr(self.physics, field["field_name"]))
-            field_names.append(name)
-            data_arrays.append(field["data"])
-        
-        if field_arrays:
-            # Vectorized evaluation across all fields and sensors
-            results = self.spatial_evaluator.eval_sensors_gpu_optimized(
-                field_arrays, self.sensor_metadata
-            )
-            
-            # Efficiently update all data arrays
-            for i, (name, data_array) in enumerate(zip(field_names, data_arrays)):
-                data_array[:, self.column_index] = results[i]
-        
+            values = field["data"]
+            field_array = getattr(self.physics, field["field_name"])
+            sols = self.spatial_evaluator.eval_all_sensors(field_array)
+            values[:, self.column_index] = sols
+
         self.column_index += 1
-    
-    def _precompute_sensor_data(self, pressure=None, x=None, y=None, z=None):
-        """Precompute sensor metadata for GPU-optimized evaluation."""
-        all_points = []
-        field_indices = {}
-        
-        current_idx = 0
-        if pressure:
-            field_indices["pressure"] = (current_idx, current_idx + len(pressure))
-            all_points.extend(pressure)
-            current_idx += len(pressure)
-        if x:
-            field_indices["x"] = (current_idx, current_idx + len(x))
-            all_points.extend(x)
-            current_idx += len(x)
-        if y:
-            field_indices["y"] = (current_idx, current_idx + len(y))
-            all_points.extend(y)
-            current_idx += len(y)
-        if z:
-            field_indices["z"] = (current_idx, current_idx + len(z))
-            all_points.extend(z)
-            current_idx += len(z)
-        
-        # Precompute element lookups and coordinate transforms (CPU-heavy operations)
-        if all_points:
-            self.sensor_metadata = self.spatial_evaluator.precompute_sensor_metadata(
-                all_points, field_indices
-            )
-        else:
-            self.sensor_metadata = None
 
     def _save_energy(self):
-        # on page 37 in Hesthaven and warburton we see how the mass matrix can be
-        # used to recover the energy (l2 norm) of the system
-        # uT M u = || u ||^2
-        # get nodal values
-        j = self.mesh.jacobians[0,:]  # shape (K,)
-        p = self.physics.p
-        u = self.physics.u
-        v = self.physics.v
-        w = self.physics.w
-        mass = self.mesh.reference_element_operators.mass_matrix
-        num_cells = self.mesh.num_cells
-        rho = self.mesh.density[0,:]  # shape (Np, K)
-        c = self.mesh.speed[0,:]      # shape (Np, K)
-        inv_bulk = 1.0 / (rho * (c**2))  # shape (Np, K
+        p, u, v, w = self.physics.p, self.physics.u, self.physics.v, self.physics.w
+        Np, K = p.shape
 
-        # potential energy: (1/2) * p^2 / (rho * c^2)
-        mass = np.asarray(mass)  # Ensure mass matrix is a cupy array
-        # Vectorized computation: p.T @ mass @ p for all cells at once
-        potential = np.einsum('ij,jk,ki->i', p.T, mass, p)
-        potential = 0.5 * inv_bulk * j * potential
-        self.potential_data[self.energy_index] = np.sum(potential)
+        # --- Potential energy ---
+        Mp = self.mass_gpu @ p              # shape (Np, K)
+        p_quad = cp.sum(p * Mp, axis=0)    # shape (K,)
+        # Broadcast p_quad to match inv_bulk shape for element-wise multiplication
+        potential = 0.5 * self.j_gpu * (self.inv_bulk_gpu * p_quad)  # shape (Np, K)
+        self.potential_data[self.energy_index] = cp.sum(potential)
 
-        # kinetic energy: (1/2) * rho * (u^2 + v^2 + w^2)
-        # Vectorized computation: u.T @ mass @ u for all cells at once
-        kinetic_u = np.einsum('ij,jk,ki->i', u.T, mass, u)
-        kinetic_v = np.einsum('ij,jk,ki->i', v.T, mass, v)
-        kinetic_w = np.einsum('ij,jk,ki->i', w.T, mass, w)
-        kinetic = (0.5 * rho * j * (kinetic_u + kinetic_v + kinetic_w))
-        self.kinetic_data[self.energy_index] = np.sum(kinetic)
+        # --- Kinetic energy ---
+        Mu = self.mass_gpu @ u
+        Mv = self.mass_gpu @ v
+        Mw = self.mass_gpu @ w
+        kinetic_quad = cp.sum(u * Mu, axis=0) + cp.sum(v * Mv, axis=0) + cp.sum(w * Mw, axis=0)
+        # Broadcast kinetic_quad across nodes for element-wise multiplication with rho
+        kinetic = 0.5 * self.j_gpu * (self.rho_gpu * kinetic_quad)  # shape (Np, K)
+        self.kinetic_data[self.energy_index] = cp.sum(kinetic)
 
-        # total energy
-        energy = np.sum(potential + kinetic)
+        # --- Total energy ---
+        energy = cp.sum(potential + kinetic)
         self.energy_data[self.energy_index] = energy
 
         self.energy_index += 1

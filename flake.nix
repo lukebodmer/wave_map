@@ -49,8 +49,7 @@
 
         ## Specify production dependencies:
         propagatedBuildInputs = [
-          #pkgs.cudatoolkit
-          #pkgs.python3.pkgs.cppimport
+          pythonPackages.cppimport # this one is in custom-nixpkgs
           pythonPackages.distutils
           pythonPackages.gmsh
           #pythonPackages.numpy

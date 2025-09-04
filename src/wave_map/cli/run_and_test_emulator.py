@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 from wave_map.emulator.emulator_setup import EmulatorSetup
 
 
@@ -12,7 +11,7 @@ def parse_args(argv=None) -> argparse.Namespace:
         "batch_name",
         type=str,
         nargs="?",
-        default="rotating_centered_ellipsoid_v2",
+        default="rotating_ellipsoid_v3",
         help="Name of the simulation batch to test (default: rotating_centered_ellipsoid_v2)",
     )
     return parser.parse_args(argv)

@@ -1,5 +1,5 @@
 [general]
-batch_name = "rotating_ellipsoid_v3"
+batch_name = "rotating_ellipsoid_v4"
 number_initial_parameter_files_to_create = 120
 base_config_path = "parameters.toml"
 

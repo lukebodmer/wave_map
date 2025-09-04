@@ -1,4 +1,3 @@
-import sys
 import os
 from contextlib import redirect_stdout, redirect_stderr
 
@@ -38,10 +37,13 @@ class ResultsValidator:
             X_train, X_test = self.outputs[train_idx], self.outputs[test_idx]
             y_train, y_test = self.inputs[train_idx], self.inputs[test_idx]
 
+            self.logger.info("...training model")
             model = self._train_ppe_model(X_train, y_train)
+            self.logger.info("...making predictions")
             predictions = PyRobustGaSP().predict_ppgasp(model, X_test)['mean']
 
             # Evaluate success metrics
+            self.logger.info("...evaluaing success")
             fold_success = self._evaluate_success(y_test, predictions)
 
             self.logger.info(f"  Density success:         {fold_success['density_success']:.2f}")
