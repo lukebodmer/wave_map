@@ -13,10 +13,14 @@ import os
 
 # Get the directory of this file and add it to cppimport's module search path
 current_dir = os.path.dirname(os.path.abspath(__file__))
+original_dir = os.getcwd()  # Save the original working directory
 sys.path.append(current_dir)
 os.chdir(current_dir)  # Change to the directory containing fun.cpp
 
 fcpp = cppimport.imp("fun")
+
+# Restore the original working directory
+os.chdir(original_dir)
 
 def test_c(num):
     

@@ -50,7 +50,6 @@
         ## Specify production dependencies:
         propagatedBuildInputs = [
           pythonPackages.cppimport # this one is in custom-nixpkgs
-          pythonPackages.distutils
           pythonPackages.gmsh
           #pythonPackages.numpy
           pythonPackages.cupy
@@ -60,6 +59,7 @@
           pythonPackages.sklearn-compat
           pythonPackages.tomli
           pythonPackages.toml
+	  pythonPackages.pytorch-bin
         ];
 
       };
@@ -90,10 +90,12 @@
               # my package
               editablePackage
 
+	      # cuda
 	      pkgs.cudatoolkit
 
-              # tools
+              # ide tools
               pythonPackages.python-lsp-server
+	      pythonPackages.pyls-flake8
               pythonPackages.flake8
             ];
 

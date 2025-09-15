@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+
 class Logger:
     def __init__(self, log_path: Path, name: str = "simlog", level=logging.INFO):
         self.log_path = log_path

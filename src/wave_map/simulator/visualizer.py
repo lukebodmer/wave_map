@@ -132,26 +132,26 @@ class Visualizer:
     def add_nodes_3d(self, field):
         """Plot nodes on the mesh with colors and opacity based on solution values."""
         import numpy as np
-        
+
         # Extract x, y, z coordinates for the nodes
         x = self._to_cpu(self.x.ravel(order='F'))
         y = self._to_cpu(self.y.ravel(order='F'))
         z = self._to_cpu(self.z.ravel(order='F'))
-        
+
         # Debug: Check if coordinates are valid
         if len(x) == 0 or len(y) == 0 or len(z) == 0:
             raise ValueError(f"Empty coordinate arrays: x={len(x)}, y={len(y)}, z={len(z)}")
-        
+
         # Stack into nodal points
         node_coordinates = np.column_stack((x, y, z))
-        
+
         # Debug: Check if node_coordinates is valid
         if node_coordinates.size == 0:
             raise ValueError("Empty node_coordinates array")
-        
+
         # Flatten the solution matrix to align with the coordinates
         field_data = self._to_cpu(self.fields[field]).ravel(order='F')
-        
+
         # Debug: Check field data
         if len(field_data) == 0:
             raise ValueError(f"Empty field data for field '{field}'")
@@ -167,8 +167,8 @@ class Visualizer:
             #opacity=opacity,
             opacity=[0.9, 0.7, 0.5, 0.5, 0, 0.5, 0.5, 0.7, 0.9],
             #opacity=[0.01, 0.05, 0.06,  0.08, 0.09, 0.2, 0.3],
-            #clim=[-.00001,.00001],
-            clim=[-0.010, 0.010],
+            clim=[-1e-7,1e-7],
+            #clim=[-0.10, 0.10],
             point_size=10,
             render_points_as_spheres=True
         )
@@ -710,7 +710,8 @@ class Visualizer:
     
         fig, ax = plt.subplots(figsize=(12, 12))
         #vmax = np.abs(data_matrix).max()
-        vmax = 0.100
+        #vmax = 0.100
+        vmax = 1e-7
         vmin = -vmax
 
         cax = ax.imshow(data_matrix, aspect='auto', cmap='seismic', origin='lower', vmin=vmin, vmax=vmax)

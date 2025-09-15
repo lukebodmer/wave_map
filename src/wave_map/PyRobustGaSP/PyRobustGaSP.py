@@ -41,7 +41,9 @@ class PyRobustGaSP(object):
         return
         
         
-    def create_task(self,design,response,
+    def create_task(self,
+                    design,
+                    response,
                     zero_mean="No",
                     nugget=0,
                     nugget_est=False,
@@ -55,11 +57,11 @@ class PyRobustGaSP(object):
                     optimization='lbfgs',
                     #alpha=np.repeat(1.9,design.shape[1]),
                     lower_bound=True,
-                    max_eval = None,
+                    max_eval=None,
                     #max_eval=max(30,20+5*design.shape[1]),
                     initial_values=None,
                     num_initial_values=2,
-                    trend = None):
+                    trend=None):
         """
         Parameters
         ----------
@@ -1220,7 +1222,7 @@ class PyRobustGaSP(object):
             if lower_bound==True:
                 if model_nugget_est:
                   model_LB = LB[:] + [-np.inf]
-                  print(model_LB)
+                  #print(model_LB)
                 else:
                   model_LB= LB[:]
               

@@ -1,5 +1,3 @@
-# File: src/wave_map/emulator/emulator_setup.py
-
 from pathlib import Path
 from wave_map.emulator.final_data_extractor import FinalDataExtractor
 from wave_map.emulator.results_validator import ResultsValidator
@@ -7,7 +5,8 @@ from wave_map.loggers.logger import Logger
 
 # Constants
 BATCH_DATA_DIR = "data/simulation_batch_data"
-LOG_FILENAME = "log.txt"
+LOG_FILENAME = "emulator_log.txt"
+LOG_NAME = "emulatorlog"
 
 
 class EmulatorSetup:
@@ -18,7 +17,7 @@ class EmulatorSetup:
     - Instantiates the ResultsValidator
     """
 
-    def __init__(self, batch_name: str, n_splits: int = 5, random_state: int = 42):
+    def __init__(self, batch_name: str, n_splits: int = 10, random_state: int = 42):
         self.batch_name = batch_name
         self.n_splits = n_splits
         self.random_state = random_state
@@ -31,9 +30,9 @@ class EmulatorSetup:
 
         self.base_output_dir = Path(f"{BATCH_DATA_DIR}/{self.batch_name}")
         self.base_output_dir.mkdir(parents=True, exist_ok=True)
+        self._create_logger()
 
         self._load_data()
-        self._create_logger()
         self._create_results_validator()
 
     def _load_data(self):
@@ -43,7 +42,8 @@ class EmulatorSetup:
 
     def _create_logger(self):
         """Create a logger for recording emulator validation results."""
-        self.logger = Logger(log_path=self.base_output_dir / LOG_FILENAME, name="emulatorlog")
+        log_path = self.base_output_dir / LOG_FILENAME
+        self.logger = Logger(log_path=log_path, name=LOG_NAME)
 
     def _create_results_validator(self):
         """Instantiate the ResultsValidator with the loaded data and logger."""

@@ -1,5 +1,3 @@
-# File: src/wave_map/emulator/ellipsoid.py
-
 import numpy as np
 import pyvista as pv
 
@@ -16,9 +14,11 @@ class Ellipsoid:
         transform: np.array, used for fast inside tests
     """
 
+    #def __init__(self, density, wavespeed, semi_major, semi_minor, direction, center=(0.5, 0.5, 0.5)):
     def __init__(self, density, wavespeed, semi_major, semi_minor, direction, center=(0.5, 0.5, 0.5)):
         self.density = density
         self.wavespeed = wavespeed
+        #self.material = material
         self.center = np.array(center)
 
         # Scaling in canonical coordinates: major axis along x
@@ -43,6 +43,7 @@ class Ellipsoid:
         return cls(
             density=params[0],
             wavespeed=params[1],
+            #material=params[2],
             semi_major=params[2],
             semi_minor=params[3],
             direction=params[4:7],

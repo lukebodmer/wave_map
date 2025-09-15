@@ -15,6 +15,7 @@ class SourceConfig:
 class MaterialConfig:
     inclusion_density: float = 8.0
     inclusion_wave_speed: float = 3.0
+    inclusion_material_id: Optional[int] = None 
     outer_density: float = 1.0
     outer_wave_speed: float = 1.5
 
@@ -26,7 +27,7 @@ class MeshConfig:
     inclusion_center: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.5])
     inclusion_scaling: List[float] = field(default_factory=lambda: [0.1, 0.1, 0.1])
     inclusion_semi_major_axis_direction: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
-    msh_file: Optional[str] = None   # <-- new optional field
+    msh_file: Optional[str] = None 
 
 @dataclass
 class SolverConfig:

@@ -29,6 +29,7 @@ dev = [
     "pytest>=6.0.0",
     "black>=22.0.0",
 ]
+
 [tool.setuptools]
 package-dir = {"" = "src"}  # Add this section to point to your src directory
 
@@ -39,10 +40,6 @@ run_simulation_batch = "wave_map.cli.run_simulation_batch:main"
 run_gui = "wave_map.cli.run_gui:main"
 run_and_test_emulator = "wave_map.cli.run_and_test_emulator:main"
 plot_all_outputs = "wave_map.cli.plot_all_outputs:main"
-
-#[tool.setuptools.package-data]
-## Include default TOML configs inside wave_simulator package
-#"simulator" = ["config/*.toml"]
 
 [tool.setuptools.package-data]
 wave_map.config = ["*.toml"]

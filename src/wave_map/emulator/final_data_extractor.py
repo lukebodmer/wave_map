@@ -30,17 +30,22 @@ class FinalDataExtractor:
         - Downsample each row (time series) by self.downsample_factor.
         - Flatten into a 1D array.
         """
-       # cut off first timestep
-        processed = sensor_data
-        processed = processed[:, 1:]
+        processed_data = sensor_data
+        # filter out small noise
+        #processed[abs(processed) < 0.0000001] = 0
+
+        # cut off first timestep
+        processed_data = processed_data[:, 1:]
 
         # trim more timesteps from start
-        processed = processed[:, 650:]
+        #processed_data = processed_data[::6, :]
+        #processed_data = np.delete(processed_data, slice(99, 125), axis=0)
+        processed_data = processed_data[:, 150:600]
 
         # downsample
-        processed = processed[:, ::self.downsample_factor]
+        processed_data = processed_data[:, ::self.downsample_factor]
 
-        return processed.flatten()
+        return processed_data.flatten()
 
     def load(self):
         """Load all simulations' parameters and sensor data."""
@@ -60,6 +65,7 @@ class FinalDataExtractor:
                 input_features = [
                     params["material"]["inclusion_density"],
                     params["material"]["inclusion_wave_speed"],
+                    #params["material"]["inclusion_material_id"],
                     params["mesh"]["inclusion_scaling"][0],
                     params["mesh"]["inclusion_scaling"][1],
                     *params["mesh"]["inclusion_semi_major_axis_direction"],

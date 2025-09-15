@@ -1,7 +1,6 @@
 import argparse
 import cProfile
 import pstats
-import sys
 from pathlib import Path
 from importlib import resources
 

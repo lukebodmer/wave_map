@@ -1,0 +1,55 @@
+# Acoustic Properties of Selected Polymers and Elastomers
+# Data sourced from: Haynes, W. M. (Ed.). (2016). CRC Handbook of Chemistry and Physics (97th ed.).
+# All values measured at or near 20°C unless otherwise noted.
+# Density (kg/m³), Longitudinal Wavespeed (m/s)
+
+[Polyvinyl_Chloride_PVC_rigid]
+density = 1390.0
+wavespeed = 2395.0
+impedance = 3329050
+
+[Polymethyl_Methacrylate_PMMA]
+density = 1180.0
+wavespeed = 2730.0
+impedance = 3221400
+
+[Nylon_66]
+density = 1110.0
+wavespeed = 2620.0
+impedance = 2908200
+
+[Polyethylene_HDPE]
+density = 960.0
+wavespeed = 2430.0
+impedance = 2332800
+
+[Polystyrene_PS]
+density = 1060.0
+wavespeed = 2350.0
+impedance = 2491000
+
+[Neoprene]
+density = 1330.0
+wavespeed = 1600.0
+impedance = 2128000
+
+[Polyethylene_LDPE]
+density = 920.0
+wavespeed = 1950.0
+impedance = 1794000
+
+[Polybutadiene]
+density = 910.0
+wavespeed = 1810.0
+impedance = 1647100
+
+[Natural_Rubber]
+density = 920.0
+wavespeed = 1550.0
+impedance = 1426000
+
+#[Elastomers.Silicone_Rubber]
+#density = 1150.0
+#longitudinal_wavespeed = 1020.0
+#impedance = 1173000
+

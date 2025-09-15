@@ -1,14 +1,14 @@
 [source]
 center = [0.5, 0.5, 0.0]
 radius = 0.05
-amplitude = 1.0
-frequency = 2
+amplitude = 1e-6
+frequency = 2000
 
 [material]
-inclusion_density = 2.0
-inclusion_wave_speed = 2.0
-outer_density = 1.0
-outer_wave_speed = 1.0
+inclusion_density = 1.0
+inclusion_wave_speed = 1.0
+outer_density = 1150.0 # silicone rubber
+outer_wave_speed = 1020.0
 
 [mesh]
 #msh_file = "cube_split.msh"
@@ -19,7 +19,7 @@ inclusion_scaling = [ 0.21325835790484687, 0.200293525939852, 0.200293525939852,
 inclusion_semi_major_axis_direction = [ 0.14174985293051756, 0.48738860063012734, 0.8616027687803602,]
 
 [solver]
-number_of_timesteps = 10000
+number_of_timesteps = 7000
 polynomial_order = 1
 
 [receivers]

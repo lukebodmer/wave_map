@@ -1,10 +1,9 @@
 import tomli
 import toml
 import shutil
-import numpy as np
 from pathlib import Path
 from importlib import resources
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 
 from wave_map.batch_runner.input_parser import BatchInputParser
 from wave_map.simulator.input_parser import SimulationInputParser
@@ -29,7 +28,7 @@ BATCH_METADATA_FILENAME = "batch_metadata.toml"
 class BatchRunnerSetup:
     """
     Manages the setup and execution of batch wave simulation runs.
-    
+
     This class handles the complete workflow for running multiple wave simulations
     with different parameter sets, including:
     - Loading and parsing batch configuration files
@@ -37,11 +36,11 @@ class BatchRunnerSetup:
     - Creating and managing mesh files with appropriate time step calculations
     - Tracking simulation completion status
     - Executing pending simulations
-    
+
     The class automatically creates necessary directory structures, generates
     missing meshes, computes optimal time steps, and maintains metadata for
     the entire batch run.
-    
+
     Attributes:
         config_path (Path): Path to the batch configuration file
         batch_name (str): Name identifier for this batch run
@@ -51,7 +50,7 @@ class BatchRunnerSetup:
         min_dt (Optional[float]): Minimum time step across all meshes
         completed_all_training_simulations (bool): Whether all sims are complete
         unsimulated_hashes (List[str]): List of parameter hashes not yet simulated
-        
+
     Example:
         >>> batch_setup = BatchRunnerSetup(Path("config/batch_params.toml"))
         >>> batch_setup.run()  # Execute all pending simulations
@@ -160,17 +159,17 @@ class BatchRunnerSetup:
         """Collect mesh information from all parameter files."""
         mesh_info = {}
         hash_functions = ParameterHashFunctions()
-        
+
         for toml_file in self.parameter_files_dir.glob("*.toml"):
             config = self._load_toml_file(toml_file)
             parser = SimulationInputParser.from_toml(config)
-            
+
             mesh_hash = hash_functions.get_mesh_hash(parser)
             polynomial_order = parser.solver.polynomial_order
-            
+
             material = config["material"]
             max_wave_speed = max(material["inclusion_wave_speed"], material["outer_wave_speed"])
-            
+
             if mesh_hash not in mesh_info:
                 mesh_info[mesh_hash] = {
                     "max_wave_speed": max_wave_speed,
@@ -178,13 +177,13 @@ class BatchRunnerSetup:
                     "smallest_radii": None,
                     "param_file": toml_file
                 }
-        
+
         return mesh_info
 
     def _save_mesh_info(self, mesh_hash: str, smallest_radii, simulation_hash: str) -> None:
         mesh_dir = self.mesh_output_dir / mesh_hash
         mesh_info_file = mesh_dir / MESH_INFO_FILENAME
-    
+
         # Convert NumPy scalars/arrays to plain floats/lists of floats
         if isinstance(smallest_radii, (list, tuple)):
             cleaned_radii = [float(r) for r in smallest_radii]
@@ -192,12 +191,12 @@ class BatchRunnerSetup:
             cleaned_radii = [float(r) for r in list(smallest_radii)]
         else:
             cleaned_radii = float(smallest_radii)
-    
+
         mesh_data = {
             "smallest_radii": cleaned_radii,
             "simulation_hash": simulation_hash
         }
-    
+
         try:
             with open(mesh_info_file, "w") as f:
                 toml.dump(mesh_data, f)
@@ -205,40 +204,54 @@ class BatchRunnerSetup:
             self.logger.info(f"Warning: Could not save mesh info for {mesh_hash}: {e}")
 
     def _compute_global_min_dt(self, mesh_info: Dict[str, Dict[str, Any]]) -> float:
-        """Compute the global minimum time step across all meshes."""
+        """Compute the global minimum time step across all meshes, using batch metadata if available."""
+
+        # Check if batch metadata exists and contains a min_dt
+        meta_file = self.base_output_dir / BATCH_METADATA_FILENAME
+        if meta_file.exists():
+            try:
+                with open(meta_file, "r") as f:
+                    metadata = toml.load(f)
+                if "min_dt" in metadata:
+                    min_dt = metadata["min_dt"]
+                    self.logger.info(f"Using min_dt from batch metadata: {min_dt:.6e}")
+                    return min_dt
+            except (IOError, toml.TomlDecodeError) as e:
+                self.logger.warning(f"Failed to read batch metadata from {meta_file}: {e}, computing min_dt manually")
+
+        # If no min_dt in metadata, compute it
         min_dt = None
-        
         for mesh_hash, info in mesh_info.items():
-            smallest_radii = info["smallest_radii"]
-            max_wave_speed = info["max_wave_speed"]
-            polynomial_order = info["polynomial_order"]
-            
+            smallest_radii = info.get("smallest_radii")
+            max_wave_speed = info.get("max_wave_speed")
+            polynomial_order = info.get("polynomial_order")
+
             if smallest_radii is None:
                 self.logger.info(f"Warning: No smallest_radii found for mesh {mesh_hash}, skipping dt calculation")
                 continue
-            
-            # Convert list to minimum value for time step calculation
+
+            # Convert list to minimum value
             if isinstance(smallest_radii, list):
                 min_radius = min(smallest_radii)
             else:
                 min_radius = float(smallest_radii)
-            
+
             calculator = TimeStepSizeCalculator(
                 max_wave_speed=max_wave_speed,
                 smallest_radii=min_radius,
                 polynomial_order=polynomial_order
             )
             dt_mesh = calculator.calculate_cfl_dt()
-            
+
             if min_dt is None or dt_mesh < min_dt:
                 min_dt = dt_mesh
-        
+
         return min_dt
 
     def _save_batch_metadata(self, mesh_info: Dict[str, Dict[str, Any]], min_dt: float) -> None:
         """Save batch metadata to TOML file."""
         meta_file = self.base_output_dir / BATCH_METADATA_FILENAME
-        
+
         metadata = {
             "min_dt": min_dt,
             "mesh": {
@@ -252,7 +265,7 @@ class BatchRunnerSetup:
                 if "simulation_hash" in info
             }
         }
-        
+
         try:
             with open(meta_file, "w") as f:
                 toml.dump(metadata, f)
