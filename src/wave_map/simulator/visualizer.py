@@ -167,7 +167,7 @@ class Visualizer:
             #opacity=opacity,
             opacity=[0.9, 0.7, 0.5, 0.5, 0, 0.5, 0.5, 0.7, 0.9],
             #opacity=[0.01, 0.05, 0.06,  0.08, 0.09, 0.2, 0.3],
-            clim=[-1e-7,1e-7],
+            clim=[-1e-6,1e-6],
             #clim=[-0.10, 0.10],
             point_size=10,
             render_points_as_spheres=True
@@ -710,8 +710,8 @@ class Visualizer:
     
         fig, ax = plt.subplots(figsize=(12, 12))
         #vmax = np.abs(data_matrix).max()
-        #vmax = 0.100
-        vmax = 1e-7
+        vmax = 0.100
+        #vmax = 1e-7
         vmin = -vmax
 
         cax = ax.imshow(data_matrix, aspect='auto', cmap='seismic', origin='lower', vmin=vmin, vmax=vmax)

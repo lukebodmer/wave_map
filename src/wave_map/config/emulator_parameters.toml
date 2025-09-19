@@ -1,6 +1,6 @@
 [general]
-batch_name = "rotating_ellipsoid_material_list"
-number_initial_parameter_files_to_create = 196
+batch_name = "for bruce"
+number_initial_parameter_files_to_create = 1
 base_config_path = "parameters.toml"
 
 [inclusion]

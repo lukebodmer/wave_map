@@ -1,4 +1,5 @@
 import pickle
+import pandas as pd
 from pathlib import Path
 import toml
 import numpy as np
@@ -14,7 +15,7 @@ class FinalDataExtractor:
     - Simulation IDs: directory names for traceability
     """
 
-    def __init__(self, batch_name: str, downsample_factor: int = 2):
+    def __init__(self, batch_name: str, downsample_factor: int = 5):
         self.batch_name = batch_name
         self.downsample_factor = downsample_factor
         self.project_root = Path(__file__).parent.parent.parent.parent
@@ -40,7 +41,7 @@ class FinalDataExtractor:
         # trim more timesteps from start
         #processed_data = processed_data[::6, :]
         #processed_data = np.delete(processed_data, slice(99, 125), axis=0)
-        processed_data = processed_data[:, 150:600]
+        processed_data = processed_data[:, 200:]
 
         # downsample
         processed_data = processed_data[:, ::self.downsample_factor]
@@ -84,4 +85,14 @@ class FinalDataExtractor:
                 outputs.append(processed_output)
                 simulation_ids.append(sim_dir.name)
 
-        return np.array(inputs), np.array(outputs), simulation_ids
+        X = np.array(inputs)
+        Y = np.array(outputs)
+
+        # --- Save to CSV ---
+        #inputs_df = pd.DataFrame(X, index=simulation_ids)
+        #outputs_df = pd.DataFrame(Y, index=simulation_ids)
+
+        #inputs_df.to_csv(self.project_root / f"data/{self.batch_name}_inputs.csv")
+        #outputs_df.to_csv(self.project_root / f"data/{self.batch_name}_outputs.csv")
+
+        return X, Y, simulation_ids

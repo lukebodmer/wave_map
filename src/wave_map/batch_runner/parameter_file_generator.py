@@ -55,16 +55,15 @@ class ParameterFileGenerator:
 
         materials = []
         idx = 0
-        for group, mats in mat_data.items():  # e.g., "Polymers", "Elastomers"
-            for name, props in mats.items():
-                materials.append({
-                    "id": idx,
-                    "group": group,
-                    "name": name,
-                    "density": props["density"],
-                    "wave_speed": props["longitudinal_wavespeed"],
-                })
-                idx += 1
+        for name, props in mat_data.items():  # e.g., "Polymers", "Elastomers"
+            materials.append({
+                #"id": idx,
+                #"group": group,
+                "name": name,
+                "density": props["density"],
+                "wave_speed": props["wavespeed"],
+            })
+            idx += 1
         return materials
 
     def generate_lhs_samples(self, n_samples: int) -> np.ndarray:
@@ -214,7 +213,7 @@ class ParameterFileGenerator:
             #config['material']['inclusion_wave_speed'] = float(speed)
             config['material']['inclusion_density'] = float(mat["density"])
             config['material']['inclusion_wave_speed'] = float(mat["wave_speed"])
-            config['material']['inclusion_material_id'] = mat["id"]
+            #config['material']['name'] = mat["name"]
             config['mesh']['inclusion_scaling'] = [float(x) for x in scaling]
             config['mesh']['inclusion_semi_major_axis_direction'] = [float(x) for x in semi_major_axis_direction]
             config['mesh']['inclusion_center'] = [float(x) for x in center]

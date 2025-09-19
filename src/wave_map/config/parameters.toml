@@ -2,7 +2,7 @@
 center = [0.5, 0.5, 0.0]
 radius = 0.05
 amplitude = 1e-6
-frequency = 2000
+frequency = 4000
 
 [material]
 inclusion_density = 1.0
@@ -19,11 +19,11 @@ inclusion_scaling = [ 0.21325835790484687, 0.200293525939852, 0.200293525939852,
 inclusion_semi_major_axis_direction = [ 0.14174985293051756, 0.48738860063012734, 0.8616027687803602,]
 
 [solver]
-number_of_timesteps = 7000
-polynomial_order = 1
+number_of_timesteps = 6000
+polynomial_order = 2
 
 [receivers]
-sensors_per_face = 25
+sensors_per_face = 0
 #additional_sensors = [[0.5, 0.5, 0.0],
 #		      [0.5, 0.5, 0.02],
 #		      [0.5, 0.5, 0.04],
@@ -35,7 +35,7 @@ sensors_per_face = 25
 #		      [0.5, 0.5, 1.00]]
 
 [output_intervals]
-image = 1000
-data = 1000
+image = 500
+data = 500
 points = 10
 energy = 100

@@ -48,7 +48,7 @@ density = 920.0
 wavespeed = 1550.0
 impedance = 1426000
 
-#[Elastomers.Silicone_Rubber]
+#[Silicone_Rubber]
 #density = 1150.0
 #longitudinal_wavespeed = 1020.0
 #impedance = 1173000

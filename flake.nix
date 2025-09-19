@@ -55,6 +55,7 @@
           pythonPackages.cupy
           pythonPackages.pyvista
           pythonPackages.panel
+          pythonPackages.pandas
           pythonPackages.scipy
           pythonPackages.sklearn-compat
           pythonPackages.tomli

@@ -19,7 +19,7 @@ class ResultsValidator:
     Success is measured using material properties and ellipsoid IoU.
     """
 
-    def __init__(self, inputs, outputs, simulation_ids, n_splits=2, random_state=42):
+    def __init__(self, inputs, outputs, simulation_ids, n_splits=10, random_state=42):
         self.inputs = np.array(inputs)
         self.outputs = np.array(outputs)
         self.simulation_ids = np.array(simulation_ids)
@@ -107,7 +107,8 @@ class ResultsValidator:
 
             self.logger.info(f"  Density success:         {fold_success['density_success']:.2f}")
             self.logger.info(f"  Wavespeed success:       {fold_success['wavespeed_success']:.2f}")
-            self.logger.info(f"  Material success:       {fold_success['material_success']:.2f}")
+            self.logger.info(f"  Bulk Modulus success:    {fold_success['bulk_modulus_success']:.2f}")
+            #self.logger.info(f"  Material success:        {fold_success['material_success']:.2f}")
             self.logger.info(f"  Shape success:           {fold_success['shape_success']:.2f}")
             #self.logger.info(f"  Overall success:         {fold_success['overall_success']:.2f}")
 
@@ -125,14 +126,17 @@ class ResultsValidator:
     def _train_ppe_model(self, X_train, y_train):
         P_rgasp = PyRobustGaSP()
         #task = P_rgasp.create_task(X_train, y_train)
+
         task = P_rgasp.create_task(X_train,
                                    y_train,
+                                   isotropic=True,
+                                   #prior_choice='ref_xi',
                                    #optimization="nelder-mead",
                                    #max_eval=max(30, 20 + 5 * X_train.shape[1]),
-                                   #num_initial_values=5,
+                                   num_initial_values=10,
                                    #kernel_type=["matern_3_2"],
-                                   nugget=1e-6,)
-                                   #nugget_est=True)
+                                   #nugget=1e-6,)
+                                   nugget_est=True)
 
         # Suppress console output
         with open(os.devnull, "w") as fnull:
@@ -156,49 +160,58 @@ class ResultsValidator:
     def _evaluate_success(self, per_sample_results):
         density_success_count = 0
         wavespeed_success_count = 0
-        material_success_count = 0
+        bulk_modulus_success_count = 0
+        #material_success_count = 0
         shape_success_count = 0
         overall_success_count = 0
 
-        material_success_tolerance = 50
-        shape_success_tolerance = 0.8
+        material_success_tolerance = 0.2
+        bulk_modulus_success_tolerance = 5.6
+        shape_success_tolerance = 0.9
 
         for true_params, pred_params, iou in per_sample_results:
             # predicted and actual values
             pred_density, pred_wavespeed = pred_params[:2]
             true_density, true_wavespeed = true_params[:2]
 
+            true_bulk_modulus = true_density * true_wavespeed**2
+            pred_bulk_modulus = pred_density * pred_wavespeed**2
+
             # density & wavespeed tolerance checks
             density_success = abs(pred_density - true_density) < material_success_tolerance
             wavespeed_success = abs(pred_wavespeed - true_wavespeed) < material_success_tolerance
+            bulk_modulus_success = abs(pred_bulk_modulus - true_bulk_modulus) < bulk_modulus_success_tolerance
 
             # find closest materials
-            density_weight = 10
-            pred_material = self._closest_material(density_weight*pred_density, pred_wavespeed)
-            true_material = self._closest_material(density_weight*true_density, true_wavespeed)
+            #density_weight = 10
+            #pred_material = self._closest_material(density_weight*pred_density, pred_wavespeed)
+            #true_material = self._closest_material(density_weight*true_density, true_wavespeed)
 
-            material_success = (pred_material == true_material)
+            #material_success = (pred_material == true_material)
 
             shape_success = iou > shape_success_tolerance
 
             # update counters
             density_success_count += density_success
             wavespeed_success_count += wavespeed_success
-            material_success_count += material_success
+            bulk_modulus_success_count += bulk_modulus_success
+            #material_success_count += material_success
             shape_success_count += shape_success
-            overall_success_count += material_success and shape_success
+            #overall_success_count += material_success and shape_success
 
             self.logger.debug(
                 f"Pred density={pred_density:.1f}, true={true_density:.1f}, "
                 f"Pred wavespeed={pred_wavespeed:.1f}, true={true_wavespeed:.1f}, "
-                f"Pred material={pred_material}, true material={true_material}"
+                f"Pred bulk modulus ={pred_bulk_modulus:.1f}, true={true_bulk_modulus:.1f}, "
+            #    f"Pred material={pred_material}, true material={true_material}"
             )
-    
+
         n = len(per_sample_results)
         return {
             "density_success": density_success_count / n,
             "wavespeed_success": wavespeed_success_count / n,
-            "material_success": material_success_count / n,
+            "bulk_modulus_success": bulk_modulus_success_count / n,
+            #"material_success": material_success_count / n,
             "shape_success": shape_success_count / n,
             "overall_success": overall_success_count / n
         }
@@ -211,7 +224,8 @@ class ResultsValidator:
     def _log_summary(self):
         density_list = [fold["fold_success"]["density_success"] for fold in self.fold_results]
         wavespeed_list = [fold["fold_success"]["wavespeed_success"] for fold in self.fold_results]
-        material_list = [fold["fold_success"]["material_success"] for fold in self.fold_results]
+        bulk_modulus_list = [fold["fold_success"]["bulk_modulus_success"] for fold in self.fold_results]
+        #material_list = [fold["fold_success"]["material_success"] for fold in self.fold_results]
         shape_list = [fold["fold_success"]["shape_success"] for fold in self.fold_results]
         #overall_list = [fold["fold_success"]["overall_success"] for fold in self.fold_results]
 
@@ -223,8 +237,11 @@ class ResultsValidator:
             f"Wavespeed success: avg={np.mean(wavespeed_list):.2f}, min={np.min(wavespeed_list):.2f}, max={np.max(wavespeed_list):.2f}"
         )
         self.logger.info(
-            f"Material success:  avg={np.mean(material_list):.2f}, min={np.min(material_list):.2f}, max={np.max(material_list):.2f}"
+            f"Bulk Modulus success: avg={np.mean(bulk_modulus_list):.2f}, min={np.min(bulk_modulus_list):.2f}, max={np.max(bulk_modulus_list):.2f}"
         )
+        #self.logger.info(
+        #    f"Material success:  avg={np.mean(material_list):.2f}, min={np.min(material_list):.2f}, max={np.max(material_list):.2f}"
+        #)
         self.logger.info(
             f"Shape success:     avg={np.mean(shape_list):.2f}, min={np.min(shape_list):.2f}, max={np.max(shape_list):.2f}"
         )

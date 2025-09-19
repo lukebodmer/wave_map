@@ -17,7 +17,7 @@ class EmulatorSetup:
     - Instantiates the ResultsValidator
     """
 
-    def __init__(self, batch_name: str, n_splits: int = 10, random_state: int = 42):
+    def __init__(self, batch_name: str, n_splits: int = 5, random_state: int = 42):
         self.batch_name = batch_name
         self.n_splits = n_splits
         self.random_state = random_state
