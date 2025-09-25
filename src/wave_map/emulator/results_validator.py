@@ -167,7 +167,7 @@ class ResultsValidator:
 
         material_success_tolerance = 0.2
         bulk_modulus_success_tolerance = 5.6
-        shape_success_tolerance = 0.9
+        shape_success_tolerance = 0.8
 
         for true_params, pred_params, iou in per_sample_results:
             # predicted and actual values
@@ -231,10 +231,10 @@ class ResultsValidator:
 
         self.logger.info("\n=== Cross-Validation Success Summary ===")
         self.logger.info(
-            f"Density success:   avg={np.mean(density_list):.2f}, min={np.min(density_list):.2f}, max={np.max(density_list):.2f}"
+            f"Density success:      avg={np.mean(density_list):.2f}, min={np.min(density_list):.2f}, max={np.max(density_list):.2f}"
         )
         self.logger.info(
-            f"Wavespeed success: avg={np.mean(wavespeed_list):.2f}, min={np.min(wavespeed_list):.2f}, max={np.max(wavespeed_list):.2f}"
+            f"Wavespeed success:    avg={np.mean(wavespeed_list):.2f}, min={np.min(wavespeed_list):.2f}, max={np.max(wavespeed_list):.2f}"
         )
         self.logger.info(
             f"Bulk Modulus success: avg={np.mean(bulk_modulus_list):.2f}, min={np.min(bulk_modulus_list):.2f}, max={np.max(bulk_modulus_list):.2f}"
@@ -243,7 +243,7 @@ class ResultsValidator:
         #    f"Material success:  avg={np.mean(material_list):.2f}, min={np.min(material_list):.2f}, max={np.max(material_list):.2f}"
         #)
         self.logger.info(
-            f"Shape success:     avg={np.mean(shape_list):.2f}, min={np.min(shape_list):.2f}, max={np.max(shape_list):.2f}"
+            f"Shape success:        avg={np.mean(shape_list):.2f}, min={np.min(shape_list):.2f}, max={np.max(shape_list):.2f}"
         )
         #self.logger.info(
         #    f"Overall success:   avg={np.mean(overall_list):.2f}, min={np.min(overall_list):.2f}, max={np.max(overall_list):.2f}"

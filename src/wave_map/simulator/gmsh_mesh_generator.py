@@ -3,29 +3,40 @@ import numpy as np
 from pathlib import Path
 from logging import getLogger
 
+BATCH_DATA_DIR = "data/simulation_batch_data"
+
 
 class GmshMeshGenerator:
-    def __init__(self, simulation_parameters, mesh_hash):
-        self.sim = simulation_parameters
+    def __init__(self, simulation_parameters, mesh_hash, batch_name):
+        # Get mesh path
+        self.base_output_path = Path(f"{BATCH_DATA_DIR}/{batch_name}")
+        self.mesh_base_output_path = self.base_output_path / "meshes"
 
-        # Build msh file path from mesh_hash
-        meshes_dir = Path(f"data/inputs/meshes/{mesh_hash}")
+        # Create msh file path from mesh_hash
+        meshes_dir = self.mesh_base_output_path / mesh_hash
         meshes_dir.mkdir(parents=True, exist_ok=True)
-        self.msh_file = meshes_dir / f"mesh.msh"
+        self.msh_file = meshes_dir / "mesh.msh"
 
-        self.grid_size = self.sim.mesh.grid_size
+        # Get simulation parameters
+        self.sim_params = simulation_parameters
+        self.grid_size = self.sim_params.mesh.grid_size
         self.percent_grid_variation = 0.03
-        self.box_size = self.sim.mesh.box_size
-        self.source_center = np.array(self.sim.source.center)
-        self.source_radius = self.sim.source.radius
-        self.inclusion_center = np.array(self.sim.mesh.inclusion_center)
-        self.inclusion_scaling = np.array(self.sim.mesh.inclusion_scaling)
-        self.inclusion_semi_major_axis_direction = np.array(self.sim.mesh.inclusion_semi_major_axis_direction)
+        self.box_size = self.sim_params.mesh.box_size
+        self.source_centers = np.array(self.sim_params.sources.centers)
+        self.source_radii = self.sim_params.sources.radii
+        self.inclusion_center = np.array(self.sim_params.mesh.inclusion_center)
+        self.inclusion_scaling = np.array(self.sim_params.mesh.inclusion_scaling)
+        self.inclusion_semi_major_axis_direction = np.array(self.sim_params.mesh.inclusion_semi_major_axis_direction)
+        self.number_of_cubes = self.sim_params.mesh.number_of_cubes
+        self.cube_centers = self.sim_params.mesh.cube_centers
+        self.cube_widths = self.sim_params.mesh.cube_widths
 
         self.smallest_radii = None
 
     def _initialize_gmsh(self):
-        gmsh.initialize()
+        if not gmsh.isInitialized():
+            gmsh.initialize()
+
         gmsh.option.setNumber("General.Terminal", 0)
 
         variation = self.percent_grid_variation
@@ -47,9 +58,44 @@ class GmshMeshGenerator:
     def _create_domain_box(self):
         return gmsh.model.occ.addBox(0, 0, 0, self.box_size, self.box_size, self.box_size)
 
-    def _add_source_disk(self):
-        sx, sy, sz = self.source_center
-        return gmsh.model.occ.addDisk(sx, sy, sz, self.source_radius, self.source_radius)
+    #def _add_source_disk(self):
+    #    sx, sy, sz = self.source_center
+    #    return gmsh.model.occ.addDisk(sx, sy, sz, self.source_radius, self.source_radius)
+
+    def _add_source_disks(self):
+        """
+        Create one gmsh disk for each source center / radius, 
+        oriented in the correct boundary plane.
+        Returns a list of (2, tag) entities for occ.fragment.
+        """
+        occ = gmsh.model.occ
+        disks = []
+        tol = 1e-8
+        
+        for (sx, sy, sz), r in zip(self.source_centers, self.source_radii):
+            # default: disk lies in XY plane at (sx, sy, sz)
+            tag = occ.addDisk(float(sx), float(sy), float(sz), float(r), float(r))
+            
+            # figure out which boundary face it's on
+            if abs(sx - 0.0) < tol or abs(sx - self.box_size) < tol:
+                # plane is yz at x=const → rotate disk (originally in XY plane) around Y-axis by 90°
+                occ.rotate([(2, tag)], sx, sy, sz, 0, 1, 0, np.pi / 2)
+                
+            elif abs(sy - 0.0) < tol or abs(sy - self.box_size) < tol:
+                # plane is xz at y=const → rotate disk around X-axis by -90°
+                occ.rotate([(2, tag)], sx, sy, sz, 1, 0, 0, -np.pi / 2)
+                
+            elif abs(sz - 0.0) < tol or abs(sz - self.box_size) < tol:
+                # plane is xy at z=const → no rotation needed
+                pass
+            
+            else:
+                raise ValueError(f"Source center {(sx, sy, sz)} is not on a boundary plane.")
+            
+            disks.append((2, tag))
+            
+            return disks
+
 
     def _axes_scaling(self):
         a, b, c = self.inclusion_scaling
@@ -64,23 +110,23 @@ class GmshMeshGenerator:
         v = self.inclusion_semi_major_axis_direction
         if np.linalg.norm(v) == 0:
             return np.eye(3)  # no rotation
-        
+
         v = v / np.linalg.norm(v)
         x_axis = np.array([1.0, 0.0, 0.0])
-        
+
         # compute rotation axis and angle
         axis = np.cross(x_axis, v)
         angle = np.linalg.norm(axis)
-        
+
         if angle == 0:
             return np.eye(3)  # already aligned
-        
+
         axis = axis / angle  # normalize rotation axis
         ux, uy, uz = axis
         cos_theta = np.cos(angle)
         sin_theta = np.sin(angle)
         one_minus_cos = 1 - cos_theta
-    
+
         return np.array([
             [cos_theta + ux**2 * one_minus_cos,
              ux*uy*one_minus_cos - uz*sin_theta,
@@ -92,7 +138,6 @@ class GmshMeshGenerator:
              uz*uy*one_minus_cos + ux*sin_theta,
              cos_theta + uz**2*one_minus_cos]
         ])
-
 
     def _format_transformation_matrix_for_gmsh(self, A):
         affine_matrix = np.eye(4)
@@ -109,7 +154,12 @@ class GmshMeshGenerator:
     def _create_affine_transformation_matrix(self):
         S = self._axes_scaling()
         R = self._create_rotation_matrix()
-        return R @ S
+ 
+    def get_smallest_radii(self):
+        _, eleTags, _ = gmsh.model.mesh.getElements(dim=3)
+        radii = gmsh.model.mesh.getElementQualities(eleTags[0], "innerRadius")
+        self.smallest_radii = np.min(radii)
+        return self.smallest_radii
 
     def generate_ellipsoid_geometry(self):
         logger = getLogger("simlog")
@@ -123,7 +173,8 @@ class GmshMeshGenerator:
 
         # create domain and source
         cube = self._create_domain_box()
-        source_disk = self._add_source_disk()
+        #source_disk = self._add_source_disk()
+        source_disks = self._add_source_disks()
 
         # generate affine matrix to transform sphere into ellipsoid
         transform_matrix = self._create_affine_transformation_matrix()
@@ -134,19 +185,65 @@ class GmshMeshGenerator:
         occ.affineTransform([(3, sphere_tag)], transform_matrix)
 
         # combine all meshes into single mesh
-        outDimTags, _ = occ.fragment([(3, cube), (3, sphere_tag)], [(2, source_disk)])
+        #outDimTags, _ = occ.fragment([(3, cube), (3, sphere_tag)], [(2, source_disk)])
+        outDimTags, _ = occ.fragment([(3, cube), (3, sphere_tag)], source_disks)
 
         # create gmsh mesh
         occ.synchronize()
 
         mesh.setSize(model.getEntities(0), self.grid_size)
         self._label_physical_groups(outDimTags)
-
         self._finalize_mesh()
         logger.info(f"... Mesh generated: {self.msh_file} ...")
 
-    def get_smallest_radii(self):
-        _, eleTags, _ = gmsh.model.mesh.getElements(dim=3)
-        radii = gmsh.model.mesh.getElementQualities(eleTags[0], "innerRadius")
-        self.smallest_radii = np.min(radii)
-        return self.smallest_radii
+    def generate_multi_cube_geometry(self):
+        """
+        Generate geometry with multiple cubes embedded inside the domain box.
+        Uses self.number_of_cubes, self.cube_centers, and self.cube_widths.
+        """
+        logger = getLogger("simlog")
+        logger.info("... Generating multi-cube inclusion mesh ...")
+        self._initialize_gmsh()
+
+        model = gmsh.model
+        occ = model.occ
+        mesh = model.mesh
+
+        # Create the outer domain box
+        domain_box = self._create_domain_box()
+
+        # Create all cube inclusions
+        cube_tags = []
+        for i in range(self.number_of_cubes):
+            cx, cy, cz = self.cube_centers[i]
+            w = self.cube_widths[i]
+
+            # gmsh.addBox wants corner coordinates, so shift from center
+            x0 = cx - w / 2
+            y0 = cy - w / 2
+            z0 = cz - w / 2
+            tag = occ.addBox(x0, y0, z0, w, w, w)
+            cube_tags.append((3, tag))
+
+        # add source disks
+        source_disks = self._add_source_disks()
+
+        # Combine domain and inclusions
+        #outDimTags, _ = occ.fragment([(3, domain_box)], cube_tags)
+
+        # fragment domain + cubes with disks
+        solids = [(3, domain_box)] + cube_tags
+        outDimTags, _ = occ.fragment(solids, source_disks)
+
+        # Synchronize CAD kernel with Gmsh model
+        occ.synchronize()
+
+        # Mesh sizing
+        mesh.setSize(model.getEntities(0), self.grid_size)
+
+        # Label physical groups for all 3D entities
+        self._label_physical_groups(outDimTags)
+
+        # Finalize mesh
+        self._finalize_mesh()
+        logger.info(f"... Multi-cube mesh generated: {self.msh_file} ...")

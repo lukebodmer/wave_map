@@ -167,8 +167,8 @@ class Visualizer:
             #opacity=opacity,
             opacity=[0.9, 0.7, 0.5, 0.5, 0, 0.5, 0.5, 0.7, 0.9],
             #opacity=[0.01, 0.05, 0.06,  0.08, 0.09, 0.2, 0.3],
-            clim=[-1e-6,1e-6],
-            #clim=[-0.10, 0.10],
+            #clim=[-1e-7, 1e-7],
+            clim=[-0.10, 0.10],
             point_size=10,
             render_points_as_spheres=True
         )
@@ -601,7 +601,7 @@ class Visualizer:
             self.plotter = pv.Plotter(off_screen=True)
             self.plotter.clear()
             self.set_camera()
-            self.add_inclusion_boundary()
+            #self.add_inclusion_boundary()
             self.add_nodes_3d("p")
             self._show_grid()
             self.plotter.screenshot(output_file)
@@ -689,7 +689,6 @@ class Visualizer:
     
         return fig
 
-
     def plot_sensor_data_as_matrix(self, show=False):
         """
         Plot pressure data from tracked_fields as a matrix, where each row corresponds
@@ -698,16 +697,16 @@ class Visualizer:
         if "pressure" not in self.tracked_fields:
             print("No pressure data in tracked_fields to plot.")
             return
-    
+
         interval = self.data['save_points_interval']
         t = self.current_time_step
         num_steps = t // interval
-    
+
         import numpy as np
         pressure_entry = self.tracked_fields["pressure"]
         data_matrix = self._to_cpu(pressure_entry["data"][:, :num_steps])  # (n_points, time)
         points = pressure_entry["points"]
-    
+
         fig, ax = plt.subplots(figsize=(12, 12))
         #vmax = np.abs(data_matrix).max()
         vmax = 0.100

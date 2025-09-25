@@ -44,7 +44,6 @@ class SimulationManager:
         self.c_gpu = cp.asarray(self.mesh.speed[0, :], dtype=float)             # shape (Np,K)
         self.inv_bulk_gpu = 1.0 / (self.rho_gpu * (self.c_gpu ** 2))            # shape (Np,K)
 
-
         self.pressure_reciever_locations = pressure_reciever_locations
         self._get_sensor_information(
             pressure_reciever_locations,
@@ -54,7 +53,7 @@ class SimulationManager:
         )
 
         self.energy_index = 0
-        self._get_source_data()
+        #self._get_source_data()
         data = self._get_data()
         self.mesh_data = self._get_mesh_data(data)
         self.visualizer = Visualizer(self.mesh_data, data)

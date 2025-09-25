@@ -7,7 +7,7 @@ from importlib import resources
 from wave_map.batch_runner.batch_runner_setup import BatchRunnerSetup
 
 # Constants
-DEFAULT_CONFIG_FILENAME = "emulator_parameters.toml"
+DEFAULT_CONFIG_FILENAME = "batch_parameters.toml"
 PROFILE_OUTPUT_FILE = "profile_stats.txt"
 
 
@@ -22,15 +22,15 @@ def get_default_config(filename=DEFAULT_CONFIG_FILENAME) -> Path:
 def parse_args(argv=None) -> argparse.Namespace:
     """Parse CLI arguments for running a simulation batch."""
     parser = argparse.ArgumentParser(
-        description="Run the emulator with the specified parameter file."
+        description="Run the simulation batch with a specified batch_parameter.toml file."
     )
     parser.add_argument(
-        "parameter_file",
+        "batch_parameter_file",
         type=Path,
         nargs="?",
         default=get_default_config(),
         help=(
-            "Path to the emulator parameter file "
+            "Path to the batch_parameter.toml file "
             f"(default: bundled {DEFAULT_CONFIG_FILENAME} in wave_map.config)"
         ),
     )
@@ -64,7 +64,7 @@ def main(argv=None):
         profiler = cProfile.Profile()
         profiler.enable()
 
-        run_simulation_batch(args.parameter_file)
+        run_simulation_batch(args.batch_parameter_file)
 
         profiler.disable()
 
@@ -75,7 +75,7 @@ def main(argv=None):
 
         print(f"Profile results saved to {args.profile_output}")
     else:
-        run_simulation_batch(args.parameter_file)
+        run_simulation_batch(args.batch_parameter_file)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,32 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 class SensorPlacer:
+    """
+    Places sensors on the boundary of a cubic simulation box while ensuring
+    they are not too close to any acoustic source.
+
+    Parameters
+    ----------
+    box_size : float, default=0.25
+        The size of the cubic simulation domain (edge length).
+    top_sensors : int, optional
+        Number of sensors on the top face (used with side_sensors).
+    side_sensors : int, optional
+        Number of sensors on one side face (used with top_sensors).
+    sensors_per_face : int, optional
+        Total number of sensors per face (must be a perfect square). If
+        specified, overrides top_sensors/side_sensors.
+    random_seed : int, default=42
+        Random seed for reproducibility of Latin Hypercube Sampling.
+    additional_sensors : list of [x, y, z], optional
+        Additional fixed sensor positions to include.
+    source_centers : array-like of shape (N, 3), optional
+        List of source center coordinates in the domain.
+    source_radii : array-like of shape (N,), optional
+        List of source radii, one for each source center.
+    """
+
     def __init__(self,
                  box_size=0.25,
                  top_sensors=None,
@@ -10,15 +34,15 @@ class SensorPlacer:
                  sensors_per_face=None,
                  random_seed=42,
                  additional_sensors=None,
-                 source_center=(0.125, 0.125, 0.0),
-                 source_radius=0.02):
+                 source_centers=None,
+                 source_radii=None):
         self.box_size = box_size
         self.top_sensors = top_sensors
         self.side_sensors = side_sensors
         self.sensors_per_face = sensors_per_face
         self.additional_sensors = additional_sensors if additional_sensors is not None else []
-        self.source_center = np.array(source_center)
-        self.source_radius = source_radius
+        self.source_centers = np.array(source_centers) if source_centers is not None else np.empty((0, 3))
+        self.source_radii = np.array(source_radii) if source_radii is not None else np.empty((0,))
         self.sensor_positions = []
         self.margin = 0.2
 
@@ -67,10 +91,12 @@ class SensorPlacer:
 
     def _filter_near_source(self, sensors):
         """
-        Removes sensors within 2 * source_radius of the source center.
+        Removes sensors within 2 * radius of any source center.
         """
-        distances = np.linalg.norm(sensors - self.source_center, axis=1)
-        mask = distances >= 2 * self.source_radius
+        mask = np.ones(len(sensors), dtype=bool)
+        for center, radius in zip(self.source_centers, self.source_radii):
+            distances = np.linalg.norm(sensors - center, axis=1)
+            mask &= distances >= 2 * radius
         return sensors[mask]
 
     def get_sensor_coordinates(self):
@@ -79,7 +105,7 @@ class SensorPlacer:
         else:
             base_sensors = self.get_lhs_sensor_coordinates()
 
-        # Remove sensors near source (only for base sensors)
+        # Remove sensors near sources (only for base sensors)
         filtered_sensors = self._filter_near_source(base_sensors)
 
         # Add additional sensors after filtering

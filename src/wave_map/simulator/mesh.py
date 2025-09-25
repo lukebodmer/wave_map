@@ -15,14 +15,18 @@ class Mesh3d:
 
     This class must be passed an element and a gmsh (.msh) file. It
     does not contain the logic for building the actual mesh.
+
+    Meshes are currently created in the simulation_setup.py file in the
+    build_simulator() function, along with a mesh_directory. Each SimulationManager object has an
+    associated mesh directory
     """
     def __init__(self,
                  finite_element: LagrangeElement,
                  msh_file=None,
                  grid_size=None,
                  box_size=None,
-                 source_center=None,
-                 source_radius=None,
+                 #source_center=None,
+                 #source_radius=None,
                  outer_density=None,
                  outer_speed=None,
                  inclusion_density=None,
@@ -34,8 +38,8 @@ class Mesh3d:
         if None not in (msh_file,
                         grid_size,
                         box_size,
-                        source_center,
-                        source_radius,
+                        #source_center,
+                        #source_radius,
                         outer_density,
                         outer_speed,
                         inclusion_density,
@@ -44,23 +48,22 @@ class Mesh3d:
                         inclusion_scaling,
                         inclusion_semi_major_axis_direction,
                         ):
+            self.msh_file = msh_file
             self.reference_element = finite_element
             self.reference_element_operators = ReferenceElementOperators(self.reference_element)
             self.dim = self.reference_element.d
             self.n = self.reference_element.n  # polynomial order
-
-            self.msh_file = msh_file
             self.grid_size = grid_size
             self.box_size = box_size
-            self.source_center = source_center
-            self.source_radius = source_radius
+            #self.source_center = source_center
+            #self.source_radius = source_radius
             self.outer_density = outer_density
             self.outer_speed = outer_speed
             self.inclusion_density = inclusion_density
             self.inclusion_speed = inclusion_speed
-            self.inclusion_center= inclusion_center
-            self.inclusion_scaling= inclusion_scaling
-            self.inclusion_semi_major_axis_direction=inclusion_semi_major_axis_direction
+            self.inclusion_center = inclusion_center
+            self.inclusion_scaling = inclusion_scaling
+            self.inclusion_semi_major_axis_direction = inclusion_semi_major_axis_direction
         else:
             raise ValueError("Invalid Mesh3d initialization: must provide all geometric parameters.")
 
@@ -100,9 +103,9 @@ class Mesh3d:
        # self.dtdz = None
        # self.jacobians = {}
        # #self.determinants = {}
-       
+
         logger = getLogger("simlog")
-        
+
         logger.info("... Extracting mesh info")
         self._extract_mesh_info()
         logger.info("... Getting material info")
@@ -161,17 +164,17 @@ class Mesh3d:
         # EcoFlex = 1063
         # Polyurethane rubber = 1016
 
-        # input order: gray matter, bone, white matter 
+        # input order: gray matter, bone, white matter
         #speed = [1398 , 2600, 974] # m/s
         #density = [1016, 2000, 1063] # kg/m^3
         #speed = [3.0 , 1.5] # m/s
         #density = [8.0, 1.0] # kg/m^3
-        speed = [self.inclusion_speed, self.outer_speed]  # physical group tags 1, 2
-        density = [self.inclusion_density, self.outer_density]
+        speed = [self.inclusion_speed, self.inclusion_speed, self.outer_speed]  # physical group tags 1, 2
+        density = [self.inclusion_density, self.inclusion_density, self.outer_density]
 
         dim = 3
         physical_groups = gmsh.model.getPhysicalGroups(dim)
-        self.speed = np.ones((self.reference_element.nodes_per_cell, self.num_cells)) # m/s 
+        self.speed = np.ones((self.reference_element.nodes_per_cell, self.num_cells)) # m/s
         self.density = np.ones((self.reference_element.nodes_per_cell, self.num_cells)) # kg/m^3
 
         # loop over all physical_groups
@@ -186,7 +189,7 @@ class Mesh3d:
                 self.density[:, np.array(elemTags)-offset[0]] = density[i]
 
     def _get_smallest_diameter(self):
-        _, eleTags , _ = gmsh.model.mesh.getElements(dim=3)
+        _, eleTags, _ = gmsh.model.mesh.getElements(dim=3)
         radii = gmsh.model.mesh.getElementQualities(eleTags[0], "innerRadius")
         self.smallest_diameter = np.min(radii) * 2
 
@@ -196,7 +199,7 @@ class Mesh3d:
         K = self.num_cells
         CtoV = self.cell_to_vertices
         num_vertices = self.num_vertices 
-        
+
         # create list of all faces
         face_vertices = np.vstack((CtoV[:, [0, 1, 2]],
                                    CtoV[:, [0, 1, 3]],
@@ -205,7 +208,7 @@ class Mesh3d:
 
         # sort each row from low to high for hash algorithm
         face_vertices = np.sort(face_vertices, axis=1)
-         
+
         # unique hash for each set of three faces by their vertex numbers
         face_hashes = face_vertices[:, 0] * num_vertices * num_vertices  + \
                      face_vertices[:, 1] * num_vertices + \
@@ -213,7 +216,7 @@ class Mesh3d:
 
         # vertex id from 1 - num_faces* num_cells
         vertex_ids = np.arange(0, num_faces*K)
-       
+
         # set up default cell to cell and cell to faces connectivity
         CtoC = np.tile(np.arange(K)[:, np.newaxis], num_faces)
         CtoF = np.tile(np.arange(num_faces), (K,1))
@@ -224,38 +227,29 @@ class Mesh3d:
                                         vertex_ids,
                                         np.ravel(CtoC, order='F'),
                                         np.ravel(CtoF, order='F')))
-        
+
         # Now we sort by global face number.
-        sorted_map_table= np.array(sorted(mapping_table, key=lambda x: (x[0], x[1])))
-        
+        sorted_map_table = np.array(sorted(mapping_table, key=lambda x: (x[0], x[1])))
+
         # find matches in the sorted face list
         matches = np.where(sorted_map_table[:-1, 0] == sorted_map_table[1:, 0])[0]
-        
+
         # make links reflexive
         match_l = np.vstack((sorted_map_table[matches], sorted_map_table[matches + 1]))
         match_r = np.vstack((sorted_map_table[matches + 1], sorted_map_table[matches]))
-        
+
         # insert matches
         CtoC_tmp = np.ravel(CtoC, order='F')
         CtoF_tmp = np.ravel(CtoF, order='F')
         CtoC_tmp[match_l[:, 1]] = match_r[:, 2]
         CtoF_tmp[match_l[:, 1]] = match_r[:, 3]
-        
+
         CtoC = CtoC_tmp.reshape(CtoC.shape, order='F')
         CtoF = CtoF_tmp.reshape(CtoF.shape, order='F')
 
         self.cell_to_cells = CtoC
         self.cell_to_faces = CtoF
-
-    def _compute_gmsh_jacobians(self):
-        """ calculate the jacobian of the mapping of each cell """
-        # get local coordinates of the verticies in the
-        # reference tetrahedron
-        name, dim, order, numNodes, localCoords, _ = gmsh.model.mesh.getElementProperties(4)
-        jacobians, determinants, _ = gmsh.model.mesh.getJacobians(4, localCoords)
-        self.gmsh_jacobians = jacobians.reshape(-1, 3, 3)
-        self.gmsh_determinants = determinants
-        
+       
     def _get_mapped_nodal_cordinates(self):
         """ returns x, y, and z arrays of coordinates of nodes from EToV and VX, VY, VZ, arrays"""
         CtoV = self.cell_to_vertices
@@ -271,17 +265,16 @@ class Mesh3d:
         vb = CtoV[:, 1].T
         vc = CtoV[:, 2].T
         vd = CtoV[:, 3].T
-        
+
         vx = vx.reshape(-1, 1)
         vy = vy.reshape(-1, 1)
         vz = vz.reshape(-1, 1)
-        
+
         # map r, s, t from standard tetrahedron to x, y, z coordinates for each element
         self.x = (0.5 * (-(1 + r + s + t) * vx[va] + (1 + r) * vx[vb] + (1 + s) * vx[vc] + (1 + t) * vx[vd])).T
         self.y = (0.5 * (-(1 + r + s + t) * vy[va] + (1 + r) * vy[vb] + (1 + s) * vy[vc] + (1 + t) * vy[vd])).T
         self.z = (0.5 * (-(1 + r + s + t) * vz[va] + (1 + r) * vz[vb] + (1 + s) * vz[vc] + (1 + t) * vz[vd])).T
 
-       
     def _compute_mapping_coefficients(self):
         """Compute the metric elements for the local mappings of the elements"""
         Dr = self.reference_element_operators.r_differentiation_matrix
@@ -378,7 +371,6 @@ class Mesh3d:
         self.nz = nz
         self.surface_jacobians = sJ
 
-
     def _compute_face_node_mappings(self):
         # get constants
         Np = self.reference_element.nodes_per_cell
@@ -388,17 +380,17 @@ class Mesh3d:
         CtoC = self.cell_to_cells
         CtoF = self.cell_to_faces
         K = self.num_cells
-        
+
         # create global node ids
         node_ids = np.arange(K * Np).reshape(Np, K, order='F')
 
         # create interior exterior map matrices
         interior_face_node_indices = np.zeros((Nfp, num_faces, K), dtype=int)
         exterior_face_node_indices = np.zeros((Nfp, num_faces, K), dtype=int)
-        
+
         # reshape face_mask
         face_node_indices = self.reference_element.face_node_indices.reshape(4, -1).T
-        
+
         # Assign interior face node indices based on local face ordering
         for cell in range(K):
             for face in range(num_faces):
@@ -436,7 +428,6 @@ class Mesh3d:
         self.exterior_face_node_indices = exterior_face_node_indices.reshape(-1, order='F')
         self.interior_face_node_indices = interior_face_node_indices.reshape(-1, order='F')
 
-
     def _find_boundary_nodes(self):
         # Identify boundary nodes (nodes with no adjacent exterior match)
         self.boundary_face_node_indices = np.where(self.exterior_face_node_indices == self.interior_face_node_indices)[0]
@@ -458,16 +449,16 @@ class Mesh3d:
         self.x = cp.asarray(self.x)
         self.y = cp.asarray(self.y)
         self.z = cp.asarray(self.z)
-        
+
         # Connectivity arrays
         self.cell_to_vertices = cp.asarray(self.cell_to_vertices)
         self.cell_to_cells = cp.asarray(self.cell_to_cells)
         self.cell_to_faces = cp.asarray(self.cell_to_faces)
-        
+
         # Material properties
         self.speed = cp.asarray(self.speed)
         self.density = cp.asarray(self.density)
-        
+
         # Jacobian and mapping coefficients
         self.jacobians = cp.asarray(self.jacobians)
         self.drdx = cp.asarray(self.drdx)
@@ -479,19 +470,19 @@ class Mesh3d:
         self.dtdx = cp.asarray(self.dtdx)
         self.dtdy = cp.asarray(self.dtdy)
         self.dtdz = cp.asarray(self.dtdz)
-        
+
         # Normal vectors and surface jacobians
         self.nx = cp.asarray(self.nx)
         self.ny = cp.asarray(self.ny)
         self.nz = cp.asarray(self.nz)
         self.surface_jacobians = cp.asarray(self.surface_jacobians)
-        
+
         # Face node mappings
         self.interior_face_node_indices = cp.asarray(self.interior_face_node_indices)
         self.exterior_face_node_indices = cp.asarray(self.exterior_face_node_indices)
         self.boundary_face_node_indices = cp.asarray(self.boundary_face_node_indices)
         self.boundary_node_indices = cp.asarray(self.boundary_node_indices)
-        
+
         # Surface to volume jacobian
         self.surface_to_volume_jacobian = cp.asarray(self.surface_to_volume_jacobian)
 
@@ -499,6 +490,15 @@ class Mesh3d:
         # get edges
         edge_vertices = gmsh.model.mesh.getElementEdgeNodes(4)
         return edge_vertices.reshape(int(len(edge_vertices)/2), 2).astype(int) - 1
+
+    def _compute_gmsh_jacobians(self):
+        """ calculate the jacobian of the mapping of each cell """
+        # get local coordinates of the verticies in the
+        # reference tetrahedron
+        name, dim, order, numNodes, localCoords, _ = gmsh.model.mesh.getElementProperties(4)
+        jacobians, determinants, _ = gmsh.model.mesh.getJacobians(4, localCoords)
+        self.gmsh_jacobians = jacobians.reshape(-1, 3, 3)
+        self.gmsh_determinants = determinants
 
     def log_info(self):
         logger = getLogger("simlog")

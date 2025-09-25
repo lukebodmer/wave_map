@@ -4,30 +4,63 @@ from typing import List, Optional
 
 
 @dataclass
-class SourceConfig:
-    center: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.0])
-    radius: float = 0.05
-    amplitude: float = 0.1
-    frequency: float = 30.0
+class SourcesConfig:
+    number: int = 1
+    centers: List[List[float]] = field(default_factory=lambda: [[0.5, 0.5, 0.0]])
+    radii: List[float] = field(default_factory=lambda: [0.05])
+    amplitudes: List[float] = field(default_factory=lambda: [0.1])
+    frequencies: List[float] = field(default_factory=lambda: [30.0])
+
+    def __post_init__(self):
+        """Validate that all lists have the correct length matching the number"""
+        if len(self.centers) != self.number:
+            raise ValueError(f"Number of centers ({len(self.centers)}) must match number ({self.number})")
+        if len(self.radii) != self.number:
+            raise ValueError(f"Number of radii ({len(self.radii)}) must match number ({self.number})")
+        if len(self.amplitudes) != self.number:
+            raise ValueError(f"Number of amplitudes ({len(self.amplitudes)}) must match number ({self.number})")
+        if len(self.frequencies) != self.number:
+            raise ValueError(f"Number of frequencies ({len(self.frequencies)}) must match number ({self.number})")
+
+        # Validate that each center has exactly 3 elements
+        for i, center in enumerate(self.centers):
+            if len(center) != 3:
+                raise ValueError(f"Center {i} must have exactly 3 elements, got {len(center)}")
 
 
 @dataclass
 class MaterialConfig:
     inclusion_density: float = 8.0
     inclusion_wave_speed: float = 3.0
-    inclusion_material_id: Optional[int] = None 
+    inclusion_material_id: Optional[int] = None
     outer_density: float = 1.0
     outer_wave_speed: float = 1.5
 
 
 @dataclass
 class MeshConfig:
+    number_of_cubes: int = 1
+    cube_centers: List[List[float]] = field(default_factory=lambda: [[0.5, 0.5, 0.5]])
+    cube_widths: List[float] = field(default_factory=lambda: [0.1])
     grid_size: float = 0.008
     box_size: float = 0.25
     inclusion_center: List[float] = field(default_factory=lambda: [0.5, 0.5, 0.5])
     inclusion_scaling: List[float] = field(default_factory=lambda: [0.1, 0.1, 0.1])
     inclusion_semi_major_axis_direction: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
-    msh_file: Optional[str] = None 
+    msh_file: Optional[str] = None
+
+    def __post_init__(self):
+        """Validate that cube-related lists have the correct length matching number_of_cubes"""
+        if len(self.cube_centers) != self.number_of_cubes:
+            raise ValueError(f"Number of cube_centers ({len(self.cube_centers)}) must match number_of_cubes ({self.number_of_cubes})")
+        if len(self.cube_widths) != self.number_of_cubes:
+            raise ValueError(f"Number of cube_widths ({len(self.cube_widths)}) must match number_of_cubes ({self.number_of_cubes})")
+
+        # Validate that each cube center has exactly 3 elements
+        for i, center in enumerate(self.cube_centers):
+            if len(center) != 3:
+                raise ValueError(f"Cube center {i} must have exactly 3 elements, got {len(center)}")
+
 
 @dataclass
 class SolverConfig:
@@ -77,7 +110,7 @@ class OutputIntervals:
 
 @dataclass
 class SimulationInputParser:
-    source: SourceConfig = field(default_factory=SourceConfig)
+    sources: SourcesConfig = field(default_factory=SourcesConfig)
     material: MaterialConfig = field(default_factory=MaterialConfig)
     mesh: MeshConfig = field(default_factory=MeshConfig)
     solver: SolverConfig = field(default_factory=SolverConfig)
@@ -87,7 +120,7 @@ class SimulationInputParser:
     @classmethod
     def from_toml(cls, cfg: dict):
         return cls(
-            source=SourceConfig(**cfg.get("source", {})),
+            sources=SourcesConfig(**cfg.get("sources", {})),
             material=MaterialConfig(**cfg.get("material", {})),
             mesh=MeshConfig(**cfg.get("mesh", {})),
             solver=SolverConfig(**cfg.get("solver", {})),

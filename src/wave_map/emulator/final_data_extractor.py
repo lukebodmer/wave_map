@@ -15,7 +15,7 @@ class FinalDataExtractor:
     - Simulation IDs: directory names for traceability
     """
 
-    def __init__(self, batch_name: str, downsample_factor: int = 5):
+    def __init__(self, batch_name: str, downsample_factor: int = 2):
         self.batch_name = batch_name
         self.downsample_factor = downsample_factor
         self.project_root = Path(__file__).parent.parent.parent.parent
@@ -23,6 +23,21 @@ class FinalDataExtractor:
 
         if not self.batch_dir.exists():
             raise ValueError(f"Batch directory not found: {self.batch_dir}")
+
+    def log_compress(self, data, eps=1e-6):
+        # elementwise log compression
+        return np.log1p(np.abs(data) / eps) * np.sign(data)
+
+    def power_compress(self, data, gamma=0.5):
+        # gamma between 0 and 1, lower gamma = stronger compression
+        return np.sign(data) * (np.abs(data) ** gamma)
+
+    def power_compress_rows(self, data, gamma=0.005):
+        row_max = np.max(np.abs(data), axis=1, keepdims=True)
+        #row_max[row_max == 0] = 1.0  # avoid division by zero
+        normalized = data / row_max
+        compressed = np.sign(normalized) * (np.abs(normalized) ** gamma)
+        return compressed
 
     def post_process_output(self, sensor_data: np.ndarray) -> np.ndarray:
         """
@@ -45,6 +60,13 @@ class FinalDataExtractor:
 
         # downsample
         processed_data = processed_data[:, ::self.downsample_factor]
+        #processed_data = self.log_compress(processed_data)
+        processed_data = self.power_compress_rows(processed_data)
+
+        # normalize each row by its maximum (avoid division by zero)
+        #row_max = processed_data.max(axis=1, keepdims=True)
+        #row_max[row_max == 0] = 1.0  # prevent divide-by-zero
+        #processed_data = processed_data / row_max
 
         return processed_data.flatten()
 

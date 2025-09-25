@@ -1,5 +1,5 @@
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 
 
@@ -17,6 +17,7 @@ class GeneralConfig:
         if not isinstance(self.number_initial_parameter_files_to_create, int) or self.number_initial_parameter_files_to_create < 0:
             raise ValueError("number_initial_parameter_files_to_create must be a non-negative integer.")
 
+
 @dataclass
 class InclusionConfig:
     inclusion_wave_speed_range: List[float]
@@ -26,8 +27,12 @@ class InclusionConfig:
     allow_inclusion_to_move: bool = False
     inclusion_is_sphere: bool = False
     inclusion_is_ellipsoid_of_revolution: bool = False
+    inclusions_are_multi_cubes: bool = False
+    cube_quantity_range: List[int] = None
+    cube_width_range: List[float] = None
 
     def __post_init__(self):
+        # Validate ranges
         for name, rng in [
             ("inclusion_wave_speed_range", self.inclusion_wave_speed_range),
             ("inclusion_density_range", self.inclusion_density_range),
@@ -44,18 +49,33 @@ class InclusionConfig:
                 if not (isinstance(subrange, list) and len(subrange) == 2 and all(isinstance(v, (int, float)) for v in subrange)):
                     raise ValueError(f"Each sublist in {name} must contain two numbers.")
 
-        if not isinstance(self.allow_inclusion_to_move, bool):
-            raise TypeError("allow_inclusion_to_move must be a boolean.")
-        if not isinstance(self.allow_inclusion_to_rotate, bool):
-            raise TypeError("allow_inclusion_to_rotate must be a boolean.")
-        if not isinstance(self.inclusion_is_sphere, bool):
-            raise TypeError("inclusion_is_sphere must be a boolean.")
-        if not isinstance(self.inclusion_is_ellipsoid_of_revolution, bool):
-            raise TypeError("inclusion_is_ellipsoid_of_revolution must be a boolean.")
+        # Validate booleans
+        for name in ["allow_inclusion_to_move", "allow_inclusion_to_rotate",
+                     "inclusion_is_sphere", "inclusion_is_ellipsoid_of_revolution",
+                     "inclusions_are_multi_cubes"]:
+            if not isinstance(getattr(self, name), bool):
+                raise TypeError(f"{name} must be a boolean.")
 
-        # 🚨 Conflict check
-        if self.inclusion_is_sphere and self.inclusion_is_ellipsoid_of_revolution:
-            raise ValueError("inclusion_is_sphere and inclusion_is_ellipsoid_of_revolution cannot both be True.")
+        # Conflict check: only one type of inclusion can be True
+        inclusion_flags = [
+            self.inclusion_is_sphere,
+            self.inclusion_is_ellipsoid_of_revolution,
+            self.inclusions_are_multi_cubes
+        ]
+        if sum(inclusion_flags) != 1:
+            raise ValueError(
+                "Exactly one of inclusion_is_sphere, inclusion_is_ellipsoid_of_revolution, "
+                "or inclusions_are_multi_cubes must be True."
+            )
+
+        # If multi-cubes, validate cube ranges
+        if self.inclusions_are_multi_cubes:
+            if not (isinstance(self.cube_quantity_range, list) and len(self.cube_quantity_range) == 2 and
+                    all(isinstance(v, int) for v in self.cube_quantity_range)):
+                raise ValueError("cube_quantity_range must be a list of two integers.")
+            if not (isinstance(self.cube_width_range, list) and len(self.cube_width_range) == 2 and
+                    all(isinstance(v, (int, float)) for v in self.cube_width_range)):
+                raise ValueError("cube_width_range must be a list of two numbers (floats).")
 
 
 @dataclass

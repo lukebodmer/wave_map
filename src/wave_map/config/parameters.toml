@@ -1,29 +1,41 @@
-[source]
-center = [0.5, 0.5, 0.0]
-radius = 0.05
-amplitude = 1e-6
-frequency = 4000
+[sources]
+number = 6
+centers = [[0.5, 0.5, 0.0],
+           [0.5, 0.5, 1.0],
+           [0.5, 0.0, 0.5],
+           [0.5, 1.0, 0.5],
+           [0.0, 0.5, 0.5],
+	   [1.0, 0.5, 0.5]]		
+radii = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+amplitudes = [1,1,1,1,1,1]
+#amplitude = 1
+frequencies = [4,4,4,4,4,4]
 
 [material]
 inclusion_density = 1.0
 inclusion_wave_speed = 1.0
-outer_density = 1150.0 # silicone rubber
-outer_wave_speed = 1020.0
+#outer_density = 1150.0 # silicone rubber
+#outer_wave_speed = 1020.0
+outer_wave_speed = 1.0
+outer_density = 1.0
 
 [mesh]
 #msh_file = "cube_split.msh"
 grid_size = 0.04
 box_size = 1.0
-inclusion_center = [0.5, 0.5, 0.5]
-inclusion_scaling = [ 0.21325835790484687, 0.200293525939852, 0.200293525939852,]
-inclusion_semi_major_axis_direction = [ 0.14174985293051756, 0.48738860063012734, 0.8616027687803602,]
+#inclusion_center = [0.5, 0.5, 0.5]
+#inclusion_scaling = [ 0.21325835790484687, 0.200293525939852, 0.200293525939852,]
+#inclusion_semi_major_axis_direction = [ 0.14174985293051756, 0.48738860063012734, 0.8616027687803602,]
+number_of_cubes = 1
+cube_centers = [[0.5, 0.5, 0.5]]
+cube_widths = [0.2]
 
 [solver]
-number_of_timesteps = 6000
-polynomial_order = 2
+number_of_timesteps = 4000
+polynomial_order = 1
 
 [receivers]
-sensors_per_face = 0
+sensors_per_face = 25
 #additional_sensors = [[0.5, 0.5, 0.0],
 #		      [0.5, 0.5, 0.02],
 #		      [0.5, 0.5, 0.04],
@@ -35,7 +47,7 @@ sensors_per_face = 0
 #		      [0.5, 0.5, 1.00]]
 
 [output_intervals]
-image = 500
-data = 500
+image = 100
+data = 100
 points = 10
 energy = 100

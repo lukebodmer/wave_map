@@ -16,7 +16,6 @@ from wave_map.simulator.simulation_setup import SimulationSetup
 
 # Constants
 BATCH_DATA_DIR = "data/simulation_batch_data"
-MESH_DATA_DIR = "data/inputs/meshes"
 BASE_CONFIG_FILENAME = "base_parameters.toml"
 LOG_FILENAME = "log.txt"
 PARAMETER_FILES_SUBDIR = "parameter_files"
@@ -60,12 +59,12 @@ class BatchRunnerSetup:
         self.params = self._load_batch_parameters()
 
         self.batch_name = self.params.general.batch_name
-        self.base_output_dir = Path(f"{BATCH_DATA_DIR}/{self.batch_name}")
+        self.base_output_path = Path(f"{BATCH_DATA_DIR}/{self.batch_name}")
         self.base_config_path = self._resolve_config_path(self.params.general.base_config_path)
-        self.parameter_files_dir = self.base_output_dir / PARAMETER_FILES_SUBDIR
-        self.mesh_output_dir = Path(MESH_DATA_DIR)
+        self.parameter_files_path = self.base_output_path / PARAMETER_FILES_SUBDIR
+        self.mesh_base_output_path = self.base_output_path / "meshes"
 
-        self.logger = Logger(log_path=self.base_output_dir / LOG_FILENAME, name="batchlog")
+        self.logger = Logger(log_path=self.base_output_path / LOG_FILENAME, name="batchlog")
         self.prepare_output_dirs()
         self.save_copy_of_config_files()
 
@@ -78,8 +77,8 @@ class BatchRunnerSetup:
         self.check_completed_simulations()
 
     def save_copy_of_config_files(self) -> None:
-        shutil.copy2(self.config_path, self.base_output_dir / self.config_path.name)
-        shutil.copy2(self.base_config_path, self.base_output_dir / BASE_CONFIG_FILENAME)
+        shutil.copy2(self.config_path, self.base_output_path / self.config_path.name)
+        shutil.copy2(self.base_config_path, self.base_output_path / BASE_CONFIG_FILENAME)
 
     def _load_toml_file(self, file_path: Path) -> Dict[str, Any]:
         """Load a TOML file and return its contents as a dictionary."""
@@ -125,12 +124,12 @@ class BatchRunnerSetup:
         )
 
     def prepare_output_dirs(self) -> None:
-        self.base_output_dir.mkdir(parents=True, exist_ok=True)
+        self.base_output_path.mkdir(parents=True, exist_ok=True)
 
     def _generate_parameter_files_if_needed(self) -> None:
         n_expected = self.params.general.number_initial_parameter_files_to_create
 
-        if self.parameter_files_dir.exists() and len(list(self.parameter_files_dir.glob("*.toml"))) >= n_expected:
+        if self.parameter_files_path.exists() and len(list(self.parameter_files_path.glob("*.toml"))) >= n_expected:
             self.logger.info("Parameter files already exist. Skipping generation.")
             return
 
@@ -147,10 +146,13 @@ class BatchRunnerSetup:
             inclusion_scaling_range=tuple(self.params.inclusion.inclusion_scaling_range),
             inclusion_is_sphere=self.params.inclusion.inclusion_is_sphere,
             inclusion_is_ellipsoid_of_revolution=self.params.inclusion.inclusion_is_ellipsoid_of_revolution,
+            inclusions_are_multi_cubes=self.params.inclusion.inclusions_are_multi_cubes,
             allow_inclusion_to_rotate=self.params.inclusion.allow_inclusion_to_rotate,
             allow_inclusion_to_move=self.params.inclusion.allow_inclusion_to_move,
             boundary_buffer=self.params.geometry.boundary_buffer,
             domain_size=domain_size,
+            cube_quantity_range=self.params.inclusion.cube_quantity_range,
+            cube_width_range=self.params.inclusion.cube_width_range
         )
 
         parameter_file_generator.create_parameter_files(n_samples=n_expected)
@@ -160,7 +162,7 @@ class BatchRunnerSetup:
         mesh_info = {}
         hash_functions = ParameterHashFunctions()
 
-        for toml_file in self.parameter_files_dir.glob("*.toml"):
+        for toml_file in self.parameter_files_path.glob("*.toml"):
             config = self._load_toml_file(toml_file)
             parser = SimulationInputParser.from_toml(config)
 
@@ -181,8 +183,7 @@ class BatchRunnerSetup:
         return mesh_info
 
     def _save_mesh_info(self, mesh_hash: str, smallest_radii, simulation_hash: str) -> None:
-        mesh_dir = self.mesh_output_dir / mesh_hash
-        mesh_info_file = mesh_dir / MESH_INFO_FILENAME
+        mesh_info_file = self._get_mesh_info_filename(mesh_hash)
 
         # Convert NumPy scalars/arrays to plain floats/lists of floats
         if isinstance(smallest_radii, (list, tuple)):
@@ -207,7 +208,7 @@ class BatchRunnerSetup:
         """Compute the global minimum time step across all meshes, using batch metadata if available."""
 
         # Check if batch metadata exists and contains a min_dt
-        meta_file = self.base_output_dir / BATCH_METADATA_FILENAME
+        meta_file = self.base_output_path / BATCH_METADATA_FILENAME
         if meta_file.exists():
             try:
                 with open(meta_file, "r") as f:
@@ -250,7 +251,7 @@ class BatchRunnerSetup:
 
     def _save_batch_metadata(self, mesh_info: Dict[str, Dict[str, Any]], min_dt: float) -> None:
         """Save batch metadata to TOML file."""
-        meta_file = self.base_output_dir / BATCH_METADATA_FILENAME
+        meta_file = self.base_output_path / BATCH_METADATA_FILENAME
 
         metadata = {
             "min_dt": min_dt,
@@ -273,24 +274,30 @@ class BatchRunnerSetup:
         except IOError as e:
             raise IOError(f"Failed to save batch metadata to {meta_file}: {e}")
 
+    def _get_mesh_directory(self, mesh_hash):
+        return self.mesh_base_output_path / mesh_hash
+
+    def _get_mesh_info_filename(self, mesh_hash):
+        mesh_directory = self._get_mesh_directory(mesh_hash)
+        return mesh_directory / MESH_INFO_FILENAME
+
     def _load_existing_mesh_metadata(self, mesh_hash: str, info: Dict[str, Any]) -> None:
         """Load metadata from existing mesh using mesh_info.toml."""
 
         hash_functions = ParameterHashFunctions()
         sim_hash = hash_functions.get_simulation_hash(info["param_file"])
         self.logger.info(f"Mesh {mesh_hash} for simulation {sim_hash} already exists.")
-    
-        mesh_dir = self.mesh_output_dir / mesh_hash
-        mesh_info_file = mesh_dir / MESH_INFO_FILENAME
-    
+
+        mesh_info_file = self._get_mesh_info_filename(mesh_hash)
+
         if mesh_info_file.exists():
             try:
                 mesh_data = self._load_toml_file(mesh_info_file)
                 info["smallest_radii"] = mesh_data.get("smallest_radii")
-    
+
                 # Always recompute simulation_hash from the parameter file
                 info["simulation_hash"] = sim_hash
-    
+
                 if info["smallest_radii"] is None:
                     self.logger.info(f"Warning: No smallest_radii found in mesh info for {mesh_hash}")
             except (FileNotFoundError, ValueError) as e:
@@ -300,23 +307,23 @@ class BatchRunnerSetup:
 
     def _generate_single_mesh(self, mesh_hash: str, info: Dict[str, Any], hash_functions: ParameterHashFunctions) -> None:
         """Generate a single mesh and update info with metadata."""
-        
+
         config = self._load_toml_file(info["param_file"])
-        parser = SimulationInputParser.from_toml(config)
+        simulation_parameters = SimulationInputParser.from_toml(config)
 
         simulation_hash = hash_functions.get_simulation_hash(info["param_file"])
-        
+
         self.logger.info(f"Generating mesh {mesh_hash} for simulation {simulation_hash}...")
 
-        gmsh_generator = GmshMeshGenerator(parser, mesh_hash)
-        gmsh_generator.generate_ellipsoid_geometry()
-        
+        gmsh_generator = GmshMeshGenerator(simulation_parameters, mesh_hash, self.batch_name)
+        #gmsh_generator.generate_ellipsoid_geometry()
+        gmsh_generator.generate_multi_cube_geometry()
+
         smallest_radii = gmsh_generator.get_smallest_radii()
 
-        
         info["smallest_radii"] = smallest_radii
         info["simulation_hash"] = simulation_hash 
-        
+
         # Save mesh metadata to mesh directory
         self._save_mesh_info(mesh_hash, smallest_radii, simulation_hash)
 
@@ -325,7 +332,7 @@ class BatchRunnerSetup:
         hash_functions = ParameterHashFunctions()
         
         for mesh_hash, info in mesh_info.items():
-            mesh_dir = self.mesh_output_dir / mesh_hash
+            mesh_dir = self._get_mesh_directory(mesh_hash)
             
             if not mesh_dir.exists():
                 self._generate_single_mesh(mesh_hash, info, hash_functions)
@@ -352,18 +359,18 @@ class BatchRunnerSetup:
         return mesh_info
 
     def check_completed_simulations(self) -> None:
-        outputs_dir = self.base_output_dir / SIMULATIONS_SUBDIR
+        outputs_dir = self.base_output_path / SIMULATIONS_SUBDIR
 
-        if not self.base_output_dir.exists():
-            self.logger.info(f"Base output directory {self.base_output_dir} does not exist.")
+        if not self.base_output_path.exists():
+            self.logger.info(f"Base output directory {self.base_output_path} does not exist.")
             return
 
-        if not self.parameter_files_dir.exists():
-            self.logger.info(f"No parameter files found at {self.parameter_files_dir}.")
+        if not self.parameter_files_path.exists():
+            self.logger.info(f"No parameter files found at {self.parameter_files_path}.")
             return
 
         parameter_hashes = {
-            f.stem for f in self.parameter_files_dir.glob("*.toml") if f.is_file()
+            f.stem for f in self.parameter_files_path.glob("*.toml") if f.is_file()
         }
         simulated_hashes = {
             d.name for d in outputs_dir.iterdir() if d.is_dir()
@@ -386,7 +393,7 @@ class BatchRunnerSetup:
         self.logger.info(f"Running {len(self.unsimulated_hashes)} missing simulations...")
 
         for hash in self.unsimulated_hashes:
-            parameter_file = self.parameter_files_dir / f"{hash}.toml"
+            parameter_file = self.parameter_files_path / f"{hash}.toml"
             if not parameter_file.exists():
                 self.logger.info(f"Parameter file {parameter_file} not found. Skipping.")
                 continue

@@ -1,13 +1,14 @@
 import cupy as np
 from wave_map.simulator.mesh import Mesh3d
 
+
 class LinearAcoustics:
     def __init__(self,
                  mesh: Mesh3d,
-                 source_center=None,
-                 source_radius=None,
-                 source_amplitude=None,
-                 source_frequency=None,
+                 source_centers=None,
+                 source_radii=None,
+                 source_amplitudes=None,
+                 source_frequencies=None,
                  ):
         self.mesh = mesh
         self.lift = np.asarray(self.mesh.reference_element_operators.lift_matrix)
@@ -20,11 +21,18 @@ class LinearAcoustics:
         self.u = np.zeros((self.nodes_per_cell, self.num_cells), order='F')
         self.v = np.zeros((self.nodes_per_cell, self.num_cells), order='F')
         self.w = np.zeros((self.nodes_per_cell, self.num_cells), order='F')
-        self.source_center = np.array(source_center)
-        self.source_radius = source_radius
-        self.source_frequency = source_frequency # Hz
-        self.source_amplitude = source_amplitude
-        self.source_duration = 1 / self.source_frequency
+        #self.source_center = np.array(source_center)
+        #self.source_radius = source_radius
+        #self.source_frequency = source_frequency # Hz
+        #self.source_amplitude = source_amplitude
+        #self.source_duration = 1 / self.source_frequency
+
+        # multiple sources
+        self.source_centers = np.array(source_centers)
+        self.source_radii = np.array(source_radii)
+        self.source_frequencies = np.array(source_frequencies)
+        self.source_amplitudes = np.array(source_amplitudes)
+
         self._locate_source_nodes()
         self.set_initial_conditions()
         # Pre-cache material properties and constants for performance
@@ -87,7 +95,10 @@ class LinearAcoustics:
         self.nx_flat = self.mesh.nx.ravel(order='F')
         self.ny_flat = self.mesh.ny.ravel(order='F')
         self.nz_flat = self.mesh.nz.ravel(order='F')
-        self.source_nodes_boundary = self.boundary_indices[self.source_nodes]
+        #self.source_nodes_boundary = self.boundary_indices[self.source_nodes]
+        self.source_nodes_boundary = [
+            self.boundary_indices[src] for src in self.source_nodes
+        ]
 
     def set_initial_conditions(self, kind="none"):
         """Set initial conditions for testing the wave propagation."""
@@ -118,52 +129,47 @@ class LinearAcoustics:
         dp = dp.reshape((Npf*num_faces, K), order='F')
         return du, dv, dw, dp
 
-    # Pulse types
-    def _compute_shifted_cosine(self, time):
+    # ------------------------------------------------------------
+    # Pulses
+    # ------------------------------------------------------------
+    def _compute_shifted_cosine(self, time, f, a):
         # shifted cosine wave
-        f = self.source_frequency 
-        a = self.source_amplitude
-        pressure = a * (1 - 1 * np.cos(2 * np.pi * f * time)) 
+        pressure = a * (1 - 1 * np.cos(2 * np.pi * f * time))
         if time <= self.source_duration:
-            return pressure 
+            return pressure
         else:
             return 0.0
 
-    def _compute_sin(self, time):
+    def _compute_sin(self, time, f, a):
         # shifted cosine wave
-        f = self.source_frequency 
-        a = self.source_amplitude
-        pressure = a * (np.sin(2 * np.pi * f * time)) 
+        pressure = a * (np.sin(2 * np.pi * f * time))
         if time < self.source_duration:
             return pressure 
         else:
             return 0
 
-    def _compute_gaussian_pulse(self, time):
-        f = self.source_frequency
-        a = self.source_amplitude
+    def _compute_ricker_wavelet(self, time, f, a):
+        #t0 = self.source_duration / 2  # center the wavelet in the source duration
+        t0 = 1 / (0.9 * self.source_frequency)  # center the wavelet in the source duration
+        tau = time - t0
+        wavelet = (1 - 2 * (np.pi * f * tau)**2) * np.exp(-(np.pi * f * tau)**2)
+        return a * wavelet
+
+    def _compute_gaussian_pulse(self, time, f, a):
         t0 = 1 / (2 * f)
         sigma = t0 / 4
         pulse = np.exp(-((time - t0)**2 / (2 * sigma**2)))
         return a * pulse
 
-    def _compute_ricker_wavelet(self, time):
-        f = self.source_frequency
-        a = self.source_amplitude
-        #t0 = self.source_duration / 2  # center the wavelet in the source duration
-        t0 = 1 / (2 * self.source_frequency)  # center the wavelet in the source duration
-        tau = time - t0
-        wavelet = (1 - 2 * (np.pi * f * tau)**2) * np.exp(-(np.pi * f * tau)**2)
-        return a * wavelet
-
-    def _get_source_pressure(self, time):
-        # choose which source pulse to use
-        #return self._compute_shifted_cosine(time)
-        #return self._compute_sin(time)
-        return self._compute_gaussian_pulse(time)
-        #return self._compute_ricker_wavelet(time)
+    def _get_source_pressures(self, time):
+        """Return list of pressures, one for each source."""
+        return [
+            self._compute_gaussian_pulse(time, f, a)
+            for f, a in zip(self.source_frequencies, self.source_amplitudes)
+        ]
 
     def _locate_source_nodes(self):
+        """Locate boundary nodes for each source region."""
         exterior_values = self.mesh.exterior_face_node_indices
         boundary = self.mesh.boundary_face_node_indices
         tol = self.mesh.reference_element.NODE_TOLERANCE
@@ -173,57 +179,59 @@ class LinearAcoustics:
         x_b = self.mesh.x.ravel(order='F')[exterior_values][boundary]
         y_b = self.mesh.y.ravel(order='F')[exterior_values][boundary]
         z_b = self.mesh.z.ravel(order='F')[exterior_values][boundary]
-            
+
+        # create a list of source node arrays
+        self.source_nodes = []
+        for (cx, cy, cz), r in zip(self.source_centers, self.source_radii):
+            # Find nodes within circular source region
+            #in_source = ((x_b - cx)**2 + (y_b - cy)**2 < r**2 + tol) & (np.abs(z_b - cz) < tol)
+            if abs(cx - 0.0) < tol or abs(cx - 1.0) < tol:
+                # source is on x=0 or x=1 plane
+                in_source = ((y_b - cy)**2 + (z_b - cz)**2 < r**2 + tol) & (np.abs(x_b - cx) < tol)
+            elif abs(cy - 0.0) < tol or abs(cy - 1.0) < tol:
+                # source is on y=0 or y=1 plane
+                in_source = ((x_b - cx)**2 + (z_b - cz)**2 < r**2 + tol) & (np.abs(y_b - cy) < tol)
+            elif abs(cz - 0.0) < tol or abs(cz - 1.0) < tol:
+                # source is on z=0 or z=1 plane
+                in_source = ((x_b - cx)**2 + (y_b - cy)**2 < r**2 + tol) & (np.abs(z_b - cz) < tol)
+
+            else:
+                raise ValueError(f"Source center at {cx}, {cy}, {cz} is not on a boundary plane.")
+
+            # convert node number to face number
+            faces = np.where(in_source)[0] // nodes_per_face
+            # get unique faces and their counts
+            unique_vals, counts = np.unique(faces, return_counts=True)
+            # only accept faces represented nodes_per_face times
+            included_faces = unique_vals[counts == nodes_per_face]
+            # convert back to node numbers
+            base = included_faces * nodes_per_face
+            # Add ranges [0, 1, ..., nodes_per_face-1] to each base
+            offsets = np.arange(nodes_per_face)
+            full_ranges = base[:, np.newaxis] + offsets
+            # Flatten to a 1D array
+            self.source_nodes.append(full_ranges.ravel())
+
         # Find nodes within circular source region
-        in_source = ((x_b - self.source_center[0])**2 +
-                     (y_b - self.source_center[1])**2 < self.source_radius**2 + tol) & \
-                     (np.abs(z_b - self.source_center[2]) < tol)
+        #in_source = ((x_b - self.source_center[0])**2 +
+        #             (y_b - self.source_center[1])**2 < self.source_radius**2 + tol) & \
+        #             (np.abs(z_b - self.source_center[2]) < tol)
 
-        # locate only face where all nodes lie in the circle
-        # convert node number to face number
-        faces = np.where(in_source)[0] // nodes_per_face
-        # get unique faces and their counts
-        unique_vals, counts = np.unique(faces, return_counts=True)
-        # only accept faces represented nodes_per_face times
-        included_faces = unique_vals[counts == nodes_per_face]
-        # convert back to node numbers 
-        base = included_faces * nodes_per_face  # shape (N,)
-        # Add ranges [0, 1, ..., 20] to each base
-        offsets = np.arange(nodes_per_face)  # shape (21,)
-        full_ranges = base[:, np.newaxis] + offsets  # shape (N, 21)
-        # Flatten to a 1D array
-        self.source_nodes = full_ranges.ravel()
+        ## locate only face where all nodes lie in the circle
+        ## convert node number to face number
+        #faces = np.where(in_source)[0] // nodes_per_face
+        ## get unique faces and their counts
+        #unique_vals, counts = np.unique(faces, return_counts=True)
+        ## only accept faces represented nodes_per_face times
+        #included_faces = unique_vals[counts == nodes_per_face]
+        ## convert back to node numbers 
+        #base = included_faces * nodes_per_face  # shape (N,)
+        ## Add ranges [0, 1, ..., 20] to each base
+        #offsets = np.arange(nodes_per_face)  # shape (21,)
+        #full_ranges = base[:, np.newaxis] + offsets  # shape (N, 21)
+        ## Flatten to a 1D array
+        #self.source_nodes = full_ranges.ravel()
 
-    def _get_source_material_properties(self, source_nodes):
-        # get material arrays
-        rho = self.rho_p.ravel(order='F')[source_nodes] 
-        c = self.c_p.ravel(order='F')[source_nodes] 
-
-        # make sure the material is homogeneous over the source
-        if np.all(rho == rho[0]):
-            rho = rho[0]
-        else:
-            raise ValueError("rho values are not constant across source_nodes.")
-        if np.all(c == c[0]):
-            c = c[0]
-        else:
-            raise ValueError("c values are not constant across source_nodes.")
-        return rho, c
-
-
-   # def _apply_source_boundary_condition(self, time, p_p):
-   #     # get source amplitude
-   #     source_pressure = self._get_source_pressure(time)
-
-   #     # get source node indices 
-   #     source_nodes = self.source_nodes_boundary  # Precomputed
-
-   #     # Overwrite pressure at the source nodes with the shifted cosine pressure
-   #     # model where the transducer meets the domain as an open boundary
-   #     p_p[source_nodes] = source_pressure
-
-   #     return p_p
- 
     def _get_flat_fields(self):
         """Return flattened field arrays (Fortran order view, no copy)."""
         return (
@@ -233,6 +241,9 @@ class LinearAcoustics:
             self.p.ravel('F'),
         )
 
+    # ------------------------------------------------------------
+    # Boundary conditions
+    # ------------------------------------------------------------
     def _apply_reflecting_bc(self, u_m, v_m, w_m, p_m, u_p, v_p, w_p, p_p, nx, ny, nz):
         """Apply perfectly reflecting wall BC on boundary faces."""
         ndotum = (
@@ -240,49 +251,43 @@ class LinearAcoustics:
             + ny[self.boundary_flat] * v_m[self.boundary_flat]
             + nz[self.boundary_flat] * w_m[self.boundary_flat]
         )
-    
+
         u_p[self.boundary_flat] = u_m[self.boundary_flat] - 2.0 * ndotum * nx[self.boundary_flat]
         v_p[self.boundary_flat] = v_m[self.boundary_flat] - 2.0 * ndotum * ny[self.boundary_flat]
         w_p[self.boundary_flat] = w_m[self.boundary_flat] - 2.0 * ndotum * nz[self.boundary_flat]
         p_p[self.boundary_flat] = p_m[self.boundary_flat]
-    
-    
-    def _apply_source_bc(self, u_m, v_m, w_m, p_m, u_p, v_p, w_p, p_p, nx, ny, nz, time):
-        """Apply source boundary condition on selected nodes."""
-        src = self.source_nodes_boundary
-        if src.size == 0:
-            return  # no source nodes → nothing to do
-    
-        # Driving pressure
-        p_b = self._get_source_pressure(time)
-    
-        # If the pulse is over (or effectively zero), don't override reflecting BC
-        #if np.isclose(p_b, 0.0, atol=1e-30):
-        #    return
 
-        # Local impedance Z = rho * c (plus side)
-        Z = self.rho_p.ravel('F')[src] * self.c_p.ravel('F')[src]
-    
-        # Interior traces at source nodes
-        pm = p_m[src]
-        um, vm, wm = u_m[src], v_m[src], w_m[src]
-        nx_s, ny_s, nz_s = nx[src], ny[src], nz[src]
-    
-        # Normal velocity
-        u_n_m = nx_s * um + ny_s * vm + nz_s * wm
-    
-        # Adjust to enforce target pressure
-        delta_u_n = (pm - p_b) / Z
-    
-        p_p[src] = p_b
-        u_p[src] = um + delta_u_n * nx_s
-        v_p[src] = vm + delta_u_n * ny_s
-        w_p[src] = wm + delta_u_n * nz_s
+    def _apply_source_bc(self, u_m, v_m, w_m, p_m, u_p, v_p, w_p, p_p, nx, ny, nz, time):
+        """Apply all source boundary conditions."""
+        pressures = self._get_source_pressures(time)
+
+        for src_nodes, p_b in zip(self.source_nodes_boundary, pressures):
+            if src_nodes.size == 0:
+                continue
+
+            # Local impedance Z = rho * c (plus side)
+            Z = self.rho_p.ravel('F')[src_nodes] * self.c_p.ravel('F')[src_nodes]
+
+            # Interior traces at source nodes
+            pm = p_m[src_nodes]
+            um, vm, wm = u_m[src_nodes], v_m[src_nodes], w_m[src_nodes]
+            nx_s, ny_s, nz_s = nx[src_nodes], ny[src_nodes], nz[src_nodes]
+
+            # Normal velocity
+            u_n_m = nx_s * um + ny_s * vm + nz_s * wm
+
+            # Adjust to enforce target pressure
+            delta_u_n = (pm - p_b) / Z
+
+            p_p[src_nodes] = p_b
+            u_p[src_nodes] = um + delta_u_n * nx_s
+            v_p[src_nodes] = vm + delta_u_n * ny_s
+            w_p[src_nodes] = wm + delta_u_n * nz_s
 
     def _apply_boundary_conditions(self, time):
         # interior/exterior node values 
         u_flat, v_flat, w_flat, p_flat = self._get_flat_fields()
-    
+
         u_m = u_flat[self.interior_indices_flat_array]
         v_m = v_flat[self.interior_indices_flat_array]
         w_m = w_flat[self.interior_indices_flat_array]
@@ -310,12 +315,12 @@ class LinearAcoustics:
 #        v_m = self.v.ravel('F')[self.interior_indices]
 #        w_m = self.w.ravel('F')[self.interior_indices]
 #        p_m = self.p.ravel('F')[self.interior_indices]
-#        
+
 #        u_p = self.u.ravel('F')[self.exterior_indices]
 #        v_p = self.v.ravel('F')[self.exterior_indices]
 #        w_p = self.w.ravel('F')[self.exterior_indices]
 #        p_p = self.p.ravel('F')[self.exterior_indices]
-#        
+
 #        # Use precomputed boundary indices
 #        boundary = self.boundary_indices
 #
@@ -359,18 +364,17 @@ class LinearAcoustics:
     def _compute_rh_flux(self):
         # Normal vector components
         nx, ny, nz = self.mesh.nx, self.mesh.ny, self.mesh.nz
-    
+
         normal_vel_jump = self.ndotup - self.ndotum
         pressure_jump = self.p_p - self.p_m
-    
+
         num = -self.Z_p * normal_vel_jump + pressure_jump
         common_term = num / self.flux_denominator 
-    
+
         self.flux_p = -self.K_m * common_term
         self.flux_u = nx * self.c_m * common_term
         self.flux_v = ny * self.c_m * common_term
         self.flux_w = nz * self.c_m * common_term
-
 
     def _compute_xijun_he_flux(self):
         # flux from Xiun He 2025 - An effective discontinuous galerkin

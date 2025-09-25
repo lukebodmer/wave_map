@@ -185,7 +185,7 @@ class UserInterface:
             
             self.visualizer.add_nodes_3d("p")
             self.visualizer._show_grid()
-            self.visualizer.add_inclusion_boundary()
+            #self.visualizer.add_inclusion_boundary()
             self.visualizer.add_sensors()
             self.visualizer.show()
             self.status_text.object = "<span style='color:green'>✅ 3D view launched.</span>"
