@@ -183,10 +183,11 @@ class UserInterface:
             if hasattr(self.visualizer.mesh, 'x') and hasattr(self.visualizer.mesh.x, 'get'):
                 self.status_text.object = "<span style='color:blue'>ℹ️ Preparing GPU data for 3D visualization...</span>"
             
-            self.visualizer.add_nodes_3d("p")
+            #self.visualizer.add_nodes_3d("p")
             self.visualizer._show_grid()
             #self.visualizer.add_inclusion_boundary()
             self.visualizer.add_sensors()
+            self.visualizer.add_wave_speed()
             self.visualizer.show()
             self.status_text.object = "<span style='color:green'>✅ 3D view launched.</span>"
         except Exception as e:

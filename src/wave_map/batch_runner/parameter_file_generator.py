@@ -91,129 +91,67 @@ class ParameterFileGenerator:
     #------------------------------
     def _create_multi_cube_parameters(self, n_samples: int):
         """
-        Sample cube widths first, then place centers so that:
-          - each cube is fully inside the domain: center in [buffer + w/2, box_size - (buffer + w/2)]
-          - cubes are separated by at least `buffer + 0.5*(w_i + w_j)` in Euclidean distance
+        Randomly place n_cubes in a 3D unit cube while respecting edge-to-edge buffer.
+        Fast 3D rejection sampling is used; for your setup (1–3 cubes, width 0.2, buffer 0.05),
+        almost all placements succeed on the first try.
         """
         hashes_seen = set()
-
+    
         for _ in range(n_samples):
-            # sample material properties
+            # --- sample material properties ---
             inclusion_density = float(
                 self.rng.uniform(self.inclusion_density_range[0], self.inclusion_density_range[1])
             )
             inclusion_wave_speed = float(
                 self.rng.uniform(self.inclusion_speed_range[0], self.inclusion_speed_range[1])
             )
-
-            # sample number of cubes and widths first
+    
+            # --- sample number of cubes and widths ---
             n_cubes = int(self.rng.integers(self.cube_quantity_range[0], self.cube_quantity_range[1] + 1))
             widths = self.rng.uniform(self.cube_width_range[0], self.cube_width_range[1], size=n_cubes).astype(float)
-
+    
             centers = []
-            attempt_limit = 1000  # safeguard against infinite loop
-
+            attempt_limit = 100
+    
             for i in range(n_cubes):
                 w_i = float(widths[i])
-                min_c = self.boundary_buffer + 0.5 * w_i
-                max_c = self.domain_size - (self.boundary_buffer + 0.5 * w_i)
-
-                # quick feasibility check
-                if min_c > max_c:
-                    raise RuntimeError(
-                        f"Cube {i} width {w_i:.6g} too large to place inside domain "
-                        f"with buffer {self.boundary_buffer:.6g} and box_size {self.domain_size:.6g}."
-                    )
-
-                placed = False
                 for attempt in range(attempt_limit):
-                    ux, uy, uz = self.rng.random(3)
-                    cx = min_c + ux * (max_c - min_c)
-                    cy = min_c + uy * (max_c - min_c)
-                    cz = min_c + uz * (max_c - min_c)
-                    candidate = np.array([cx, cy, cz], dtype=float)
-
-                    # check pairwise separation using buffer + half-widths
+                    # sample candidate center in valid domain range
+                    candidate = self.rng.uniform(
+                        self.boundary_buffer + 0.5 * w_i,
+                        self.domain_size - (self.boundary_buffer + 0.5 * w_i),
+                        size=3
+                    )
+    
+                    # check edge-to-edge separation from all previously placed cubes
                     ok = True
                     for j, c in enumerate(centers):
                         w_j = float(widths[j])
-                        min_allowed = self.boundary_buffer + 0.5 * (w_i + w_j)
-                        if np.linalg.norm(candidate - np.array(c)) < (min_allowed - 1e-12):
+                        min_allowed = 0.5 * w_i * np.sqrt(3) + 0.5 * w_j * np.sqrt(3) + self.boundary_buffer
+                        if np.linalg.norm(candidate - np.array(c)) < min_allowed - 1e-12:
                             ok = False
                             break
 
                     if ok:
                         centers.append(candidate.tolist())
-                        placed = True
                         break
-
-                if not placed:
+                else:
                     raise RuntimeError(
                         f"Could not place cube {i+1}/{n_cubes} with width {w_i:.6g} "
-                        f"after {attempt_limit} attempts. Try reducing widths or cube count."
+                        f"after {attempt_limit} attempts. Consider reducing widths or cube count."
                     )
-
-            # Build config and write
+    
+            # --- build config ---
             config = self.base_config.copy()
             config['material']['inclusion_density'] = inclusion_density
             config['material']['inclusion_wave_speed'] = inclusion_wave_speed
             config['mesh']['number_of_cubes'] = n_cubes
             config['mesh']['cube_centers'] = [[float(x), float(y), float(z)] for x, y, z in centers]
             config['mesh']['cube_widths'] = [float(w) for w in widths]
-
+    
             self._write_config(config, hashes_seen)
-
+    
         print(f"Generated {len(hashes_seen)} unique multi-cube parameter files in {self.output_dir}")
-
-    # ------------------------------
-    # Sphere workflow
-    # ------------------------------
-    def _create_sphere_parameters(self, n_samples: int):
-        bounds = [self.inclusion_scaling_range[0]]
-        if self.allow_inclusion_to_rotate:
-            bounds += [(0.0, 1.0)] * 3
-        if self.allow_inclusion_to_move:
-            bounds += [(0.0, 1.0)] * 3
-        samples = self._generate_lhs_samples(n_samples, bounds)
-
-        hashes_seen = set()
-        for row in samples:
-            mat = self.rng.choice(self.materials)
-            idx = 0
-            s = row[idx]; idx += 1
-            scaling = [s, s, s]
-
-            if self.allow_inclusion_to_rotate:
-                vx, vy, vz = row[idx:idx+3]; idx += 3
-                vec = np.abs([vx, vy, vz])
-                vec /= np.linalg.norm(vec)
-                direction = vec.tolist()
-            else:
-                direction = [1.0, 0.0, 0.0]
-
-            if self.allow_inclusion_to_move:
-                ux, uy, uz = row[idx:idx+3]; idx += 3
-                radius_equiv = max(scaling)
-                buffer = self.boundary_buffer + radius_equiv
-                lower = buffer; upper = self.domain_size - buffer
-                cx = lower + ux * (upper - lower)
-                cy = lower + uy * (upper - lower)
-                cz = lower + uz * (upper - lower)
-                center = [cx, cy, cz]
-            else:
-                c = self.domain_size / 2
-                center = [c, c, c]
-
-            config = self.base_config.copy()
-            config['material']['inclusion_density'] = float(mat["density"])
-            config['material']['inclusion_wave_speed'] = float(mat["wave_speed"])
-            config['mesh']['inclusion_scaling'] = [float(x) for x in scaling]
-            config['mesh']['inclusion_semi_major_axis_direction'] = [float(x) for x in direction]
-            config['mesh']['inclusion_center'] = [float(x) for x in center]
-
-            self._write_config(config, hashes_seen)
-
-        print(f"Generated {len(hashes_seen)} unique sphere parameter files in {self.output_dir}")
 
     # ------------------------------
     # Ellipsoid of revolution workflow

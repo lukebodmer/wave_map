@@ -56,7 +56,8 @@ class GmshMeshGenerator:
         # gmsh.finalize()  # Keep open if caller wants more queries
 
     def _create_domain_box(self):
-        return gmsh.model.occ.addBox(0, 0, 0, self.box_size, self.box_size, self.box_size)
+        domain_tag = gmsh.model.occ.addBox(0, 0, 0, self.box_size, self.box_size, self.box_size)
+        return domain_tag
 
     #def _add_source_disk(self):
     #    sx, sy, sz = self.source_center
@@ -64,38 +65,37 @@ class GmshMeshGenerator:
 
     def _add_source_disks(self):
         """
-        Create one gmsh disk for each source center / radius, 
+        Create one gmsh disk for each source center / radius,
         oriented in the correct boundary plane.
         Returns a list of (2, tag) entities for occ.fragment.
         """
         occ = gmsh.model.occ
         disks = []
         tol = 1e-8
-        
-        for (sx, sy, sz), r in zip(self.source_centers, self.source_radii):
+
+        for j, ((sx, sy, sz), r) in enumerate(zip(self.source_centers, self.source_radii)):
             # default: disk lies in XY plane at (sx, sy, sz)
             tag = occ.addDisk(float(sx), float(sy), float(sz), float(r), float(r))
-            
+
             # figure out which boundary face it's on
             if abs(sx - 0.0) < tol or abs(sx - self.box_size) < tol:
                 # plane is yz at x=const → rotate disk (originally in XY plane) around Y-axis by 90°
                 occ.rotate([(2, tag)], sx, sy, sz, 0, 1, 0, np.pi / 2)
-                
+
             elif abs(sy - 0.0) < tol or abs(sy - self.box_size) < tol:
                 # plane is xz at y=const → rotate disk around X-axis by -90°
                 occ.rotate([(2, tag)], sx, sy, sz, 1, 0, 0, -np.pi / 2)
-                
+
             elif abs(sz - 0.0) < tol or abs(sz - self.box_size) < tol:
                 # plane is xy at z=const → no rotation needed
                 pass
-            
+
             else:
                 raise ValueError(f"Source center {(sx, sy, sz)} is not on a boundary plane.")
-            
-            disks.append((2, tag))
-            
-            return disks
 
+            disks.append((2, tag))
+
+        return disks
 
     def _axes_scaling(self):
         a, b, c = self.inclusion_scaling
@@ -230,7 +230,6 @@ class GmshMeshGenerator:
 
         # Combine domain and inclusions
         #outDimTags, _ = occ.fragment([(3, domain_box)], cube_tags)
-
         # fragment domain + cubes with disks
         solids = [(3, domain_box)] + cube_tags
         outDimTags, _ = occ.fragment(solids, source_disks)
@@ -238,11 +237,40 @@ class GmshMeshGenerator:
         # Synchronize CAD kernel with Gmsh model
         occ.synchronize()
 
+        # --- Assign physical groups using outDimTags ---
+        # We'll classify volumes (dim=3) as OuterDomain or CubeN
+        cube_centers = np.array(self.cube_centers)
+        tol = 1e-6  # small tolerance for bounding box check
+
+        for dim, tag in outDimTags:
+            if dim == 3:
+                # Get the bounding box of this volume
+                xmin, ymin, zmin, xmax, ymax, zmax = occ.getBoundingBox(dim, tag)
+                center = np.array([(xmin + xmax)/2, (ymin + ymax)/2, (zmin + zmax)/2])
+
+                # Check if this volume matches any cube center
+                matched = False
+                for i, cc in enumerate(cube_centers):
+                    if np.all(np.abs(center - cc) < tol):
+                        phys = model.addPhysicalGroup(3, [tag])
+                        model.setPhysicalName(3, phys, f"Cube{i}")
+                        matched = True
+                        break
+                if not matched:
+                    # Otherwise, it's the outer domain
+                    phys = model.addPhysicalGroup(3, [tag])
+                    model.setPhysicalName(3, phys, "BackgroundMaterial")
+
+            elif dim == 2:
+                # Surfaces (source disks)
+                phys = model.addPhysicalGroup(2, [tag])
+                model.setPhysicalName(2, phys, f"Source{tag}")
+
         # Mesh sizing
         mesh.setSize(model.getEntities(0), self.grid_size)
 
         # Label physical groups for all 3D entities
-        self._label_physical_groups(outDimTags)
+        #self._label_physical_groups(outDimTags)
 
         # Finalize mesh
         self._finalize_mesh()

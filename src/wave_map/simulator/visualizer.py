@@ -19,7 +19,7 @@ class Visualizer:
 
         # set camera
         self.set_camera()
-    
+
     def _to_cpu(self, array):
         """Convert CuPy array to NumPy array for PyVista compatibility"""
         if hasattr(array, 'get'):  # CuPy array
@@ -168,13 +168,13 @@ class Visualizer:
             opacity=[0.9, 0.7, 0.5, 0.5, 0, 0.5, 0.5, 0.7, 0.9],
             #opacity=[0.01, 0.05, 0.06,  0.08, 0.09, 0.2, 0.3],
             #clim=[-1e-7, 1e-7],
-            clim=[-0.10, 0.10],
+            clim=[-1.00, 1.00],
             point_size=10,
             render_points_as_spheres=True
         )
 
     def add_node_list(self, nodes):
-        
+
         # get interior nodes
         interior_values = self.interior_face_node_indices
         x = self.x.ravel(order='F')[interior_values]
@@ -195,16 +195,16 @@ class Visualizer:
             point_size=10,
             render_points_as_spheres=True
         )
-        
+
     def add_cell_nodes(self, cell_list):
         # Extract x, y, z coordinates for the nodes in the specified cells 
         x = self.x[:, cell_list].flatten()
         y = self.y[:, cell_list].flatten()
         z = self.z[:, cell_list].flatten()
-        
+
         # Stack into nodal points
         node_coordinates = cp.column_stack((x, y, z))
-        
+
         # Add the points to the plot
         self.plotter.add_points(
             node_coordinates,
@@ -237,31 +237,31 @@ class Visualizer:
     def add_cells(self, cell_list):
         """Highlight specific cells on the mesh."""
         import numpy as np
-        
+
         # Get Jacobian values for all cells (using first element of each column)
         jacobian_values = self._to_cpu(self.jacobians)
-            
+
         # Normalize Jacobian values to create a color map
         cmap = plt.cm.viridis  # You can choose any colormap
         norm = plt.Normalize(vmin=np.min(jacobian_values), vmax=np.max(jacobian_values))
-            
+
         for cell in cell_list:
             # Get the Jacobian value for the current cell
             jacobian_value = jacobian_values[cell]
-                
+
             # Normalize and map the Jacobian value to color
             color = cmap(norm(jacobian_value))[:3]  # Use only the RGB channels
-                
+
             # Create the mesh for the highlighted cell
             cell_to_vertices_cpu = self._to_cpu(self.cell_to_vertices)
             vertex_coordinates_cpu = self._to_cpu(self.vertex_coordinates)
-            
+
             cell_mesh = pv.UnstructuredGrid(
                 np.hstack([[4], cell_to_vertices_cpu[cell]]).flatten(),
                 [pv.CellType.TETRA],
                 vertex_coordinates_cpu
             )
-                
+
             # Apply color based on the Jacobian value
             self.plotter.add_mesh(
                 cell_mesh,
@@ -408,16 +408,16 @@ class Visualizer:
     
         # create a pyvista unstructured grid
         grid = pv.UnstructuredGrid(
-            cells,
-            cell_types,
-            points
+            cells.get() if hasattr(cells, "get") else cells,
+            cell_types.get() if hasattr(cell_types, "get") else cell_types,
+            points.get() if hasattr(points, "get") else points
         )
            
         # add to plotter
         self.plotter.add_mesh(
             grid,
-            scalars=self.speed,
-            opacity=0.05#'linear'#abs(wave_speed)
+            scalars=self.speed.get(),
+            opacity=0.05
         )
 
     def add_mesh(self):
@@ -709,7 +709,7 @@ class Visualizer:
 
         fig, ax = plt.subplots(figsize=(12, 12))
         #vmax = np.abs(data_matrix).max()
-        vmax = 0.100
+        vmax = 1.000
         #vmax = 1e-7
         vmin = -vmax
 

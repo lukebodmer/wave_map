@@ -150,43 +150,57 @@ class Mesh3d:
 
         # get cell information
         # get all the nodes from tetrahedrons (elementType = 4)
-        node_tags, _, _ = gmsh.model.mesh.getNodesByElementType(4) 
-        self.num_cells = int(len(node_tags)/4) 
+        node_tags, _, _ = gmsh.model.mesh.getNodesByElementType(4)
+        self.num_cells = int(len(node_tags)/4)
         self.cell_to_vertices = node_tags.reshape(-1, 4).astype(int) - 1
 
     def _get_material_info(self):
-        # Material Speed List (m/s)
-        # bone = 2600 (Thomas Riis 2021)
-        # EcoFlex00-10 = 974 (Cafarelli 2016)
-        # Polyurethane rubber = 1398
-        # Material Density List (kg/m^3)
-        # bone = 2000 (Hamed Abdi 2024)
-        # EcoFlex = 1063
-        # Polyurethane rubber = 1016
+        """
+        Assign material properties (speed and density) to elements
+        based on the physical group they belong to.
+        """
+        model = gmsh.model
 
-        # input order: gray matter, bone, white matter
-        #speed = [1398 , 2600, 974] # m/s
-        #density = [1016, 2000, 1063] # kg/m^3
-        #speed = [3.0 , 1.5] # m/s
-        #density = [8.0, 1.0] # kg/m^3
-        speed = [self.inclusion_speed, self.inclusion_speed, self.outer_speed]  # physical group tags 1, 2
-        density = [self.inclusion_density, self.inclusion_density, self.outer_density]
+        # Build a dictionary of physical group names to properties
+        material_map = {}
 
+        # Background / domain material
+        material_map["BackgroundMaterial"] = {
+            "speed": self.outer_speed,
+            "density": self.outer_density,
+        }
+
+        # Discover cubes from physical group names (Cube0, Cube1, …)
         dim = 3
-        physical_groups = gmsh.model.getPhysicalGroups(dim)
-        self.speed = np.ones((self.reference_element.nodes_per_cell, self.num_cells)) # m/s
-        self.density = np.ones((self.reference_element.nodes_per_cell, self.num_cells)) # kg/m^3
+        physical_groups = model.getPhysicalGroups(dim)
+        for dim, tag in physical_groups:
+            name = model.getPhysicalName(dim, tag)
+            if name.startswith("Cube"):
+                material_map[name] = {
+                    "speed": self.inclusion_speed,
+                    "density": self.inclusion_density,
+                }
 
-        # loop over all physical_groups
-        for i, group in enumerate(physical_groups):
-            dim = group[0]
-            tag = group[1]
-            entities = gmsh.model.getEntitiesForPhysicalGroup(dim, tag)
+        # Allocate arrays
+        self.speed = np.zeros((self.reference_element.nodes_per_cell, self.num_cells))
+        self.density = np.zeros((self.reference_element.nodes_per_cell, self.num_cells))
+
+        # Loop through physical groups and assign properties
+        dim = 3
+        physical_groups = model.getPhysicalGroups(dim)
+        for dim, tag in physical_groups:
+            name = model.getPhysicalName(dim, tag)
+            if name not in material_map:
+                continue  # skip groups without assigned material
+
+            material_properties = material_map[name]
+            entities = model.getEntitiesForPhysicalGroup(dim, tag)
+
             for entity in entities:
-                elemTypes, elemTags, elemNodeTags = gmsh.model.mesh.getElements(dim, entity)
+                elemTypes, elemTags, elemNodeTags = model.mesh.getElements(dim, entity)
                 offset, _ = gmsh.model.mesh.getElementsByType(4)
-                self.speed[:, np.array(elemTags)-offset[0]] = speed[i]
-                self.density[:, np.array(elemTags)-offset[0]] = density[i]
+                self.speed[:, np.array(elemTags)-offset[0]] = material_properties["speed"]
+                self.density[:, np.array(elemTags)-offset[0]] = material_properties["density"]
 
     def _get_smallest_diameter(self):
         _, eleTags, _ = gmsh.model.mesh.getElements(dim=3)
@@ -198,7 +212,7 @@ class Mesh3d:
         num_faces = 4
         K = self.num_cells
         CtoV = self.cell_to_vertices
-        num_vertices = self.num_vertices 
+        num_vertices = self.num_vertices
 
         # create list of all faces
         face_vertices = np.vstack((CtoV[:, [0, 1, 2]],
@@ -210,9 +224,9 @@ class Mesh3d:
         face_vertices = np.sort(face_vertices, axis=1)
 
         # unique hash for each set of three faces by their vertex numbers
-        face_hashes = face_vertices[:, 0] * num_vertices * num_vertices  + \
-                     face_vertices[:, 1] * num_vertices + \
-                     face_vertices[:, 2] + 1
+        face_hashes = face_vertices[:, 0] * num_vertices * num_vertices + \
+                      face_vertices[:, 1] * num_vertices + \
+                      face_vertices[:, 2] + 1
 
         # vertex id from 1 - num_faces* num_cells
         vertex_ids = np.arange(0, num_faces*K)
