@@ -1,4 +1,3 @@
-import glob
 import pickle
 import tomli
 import panel as pn
@@ -11,6 +10,7 @@ from wave_map.simulator.visualizer import Visualizer
 
 pn.extension('vtk')
 
+
 class UserInterface:
     def __init__(self, outputs_dir='data/simulation_batch_data'):
         self.outputs_dir = Path(outputs_dir)
@@ -22,8 +22,8 @@ class UserInterface:
         self.family_selector = pn.widgets.Select(name='Simulation Family', options=family_options, value="")
         self.family_selector.param.watch(self._update_family, 'value')
 
-        self.sim_folders = []  # 👈 Initialize empty, will be set when family is selected
-        sim_options = [""]  # 👈 No folders yet
+        self.sim_folders = []  # Initialize empty, will be set when family is selected
+        sim_options = [""]  # No folders yet
 
         self.selected_folder = None
         self.data_files = []

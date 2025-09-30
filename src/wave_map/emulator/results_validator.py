@@ -1,16 +1,21 @@
 import os
+import pyvista as pv
+import pickle
 import json
 from contextlib import redirect_stdout, redirect_stderr
 import tomli
+from pathlib import Path
 
 import numpy as np
+from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from wave_map.PyRobustGaSP import PyRobustGaSP
 from logging import getLogger
 from importlib import resources
 
 from wave_map.emulator.ellipsoid_similarity_measurer import EllipsoidSimilarityMeasurer
-from wave_map.emulator.parallel_partial_emulator import ParallelPartialEmulator
+
+BATCH_DATA_DIR = "data/simulation_batch_data"
 
 
 class ResultsValidator:
@@ -19,13 +24,17 @@ class ResultsValidator:
     Success is measured using material properties and ellipsoid IoU.
     """
 
-    def __init__(self, inputs, outputs, simulation_ids, n_splits=10, random_state=42):
+    def __init__(self, batch_name, inputs, outputs, simulation_ids, n_splits=10, random_state=42):
+        self.base_output_path = Path(f"{BATCH_DATA_DIR}/{batch_name}")
+        self.ppe_output_path = self.base_output_path / "saved_emulators"
+        self.ppe_output_path.mkdir(parents=True, exist_ok=True)
+        self.predictions_output_path = self.base_output_path / "kspace_predictions"
+        self.predictions_output_path.mkdir(parents=True, exist_ok=True)
         self.inputs = np.array(inputs)
         self.outputs = np.array(outputs)
         self.simulation_ids = np.array(simulation_ids)
         self.n_splits = n_splits
         self.random_state = random_state
-
         self.material_list_file = resources.files("wave_map.config") / "material_properties.toml"
         self._get_materials_list()
         self.similarity_measurer = EllipsoidSimilarityMeasurer(num_samples=10000)
@@ -75,6 +84,121 @@ class ResultsValidator:
             per_sample_results.append((actual, pred, iou))
 
         return per_sample_results
+
+    def _remove_constant_columns(self, Y, ref_mask=None, log_prefix=""):
+        """
+        Remove columns in Y that are constant across all rows.
+        If ref_mask is provided, apply the same mask (for test data).
+        Returns (Y_new, mask)
+        """
+        if ref_mask is None:
+            stds = np.std(Y, axis=0)
+            mask = stds > 1e-12
+            dropped = np.where(~mask)[0]
+            self.logger.info(
+                f"{log_prefix} Dropped {len(dropped)} constant columns "
+                f"out of {Y.shape[1]} total."
+            )
+            if len(dropped) > 0:
+                self.logger.debug(f"{log_prefix} Constant column indices: {dropped.tolist()}")
+        else:
+            mask = ref_mask
+        return Y[:, mask], mask
+
+    def run_simple_validation(self, grid_size: int = 64, trim_fraction: float = 1.0):
+        """
+        Train a single PPE on 90% of data and validate on 10%.
+        Predictions (k-space) are inverse transformed back to spatial voxel grids
+        and visualized with pyvista.
+        """
+        self.logger.info("Running simple 90/10 validation...")
+
+        # --- Split train/test ---
+        X_train, X_test, y_train, y_test, sim_ids_train, sim_ids_test = train_test_split(
+            self.outputs, self.inputs, self.simulation_ids, test_size=0.1,
+            random_state=self.random_state, shuffle=True
+        )
+
+        # --- Remove constant columns from k-space features ---
+        y_train, mask = self._remove_constant_columns(y_train)
+        y_test, _ = self._remove_constant_columns(y_test, ref_mask=mask)
+
+        # --- Train PPE ---
+        self.logger.info("...training PPE model")
+        P_rgasp = PyRobustGaSP()
+        task = P_rgasp.create_task(
+            X_train,
+            y_train,
+            isotropic=True,
+            #optimization="nelder-mead",
+            #num_initial_values=10,
+            #nugget_est=True
+        )
+
+        #with open(os.devnull, "w") as fnull:
+        #    with redirect_stdout(fnull), redirect_stderr(fnull):
+        #        model = P_rgasp.train_ppgasp(task)
+        model = P_rgasp.train_ppgasp(task)
+
+        # save model
+        model_file = self.ppe_output_path / "parallel_partial_emulator.pkl"
+        with open(model_file, "wb") as f:
+            pickle.dump(model, f)
+            self.logger.info(f"Saved trained PPE model to: {model_file}")
+
+        # --- Predict ---
+        self.logger.info("...predicting on hold-out data")
+        predictions = P_rgasp.predict_ppgasp(model, X_test)["mean"]
+
+        # --- Loop through predictions ---
+        for idx, (pred_vec, true_vec, sim_id) in enumerate(zip(predictions, y_test, sim_ids_test)):
+            self.logger.info(f"Reconstructing voxel grid for test sample {idx+1}/{len(y_test)} (ID={sim_id})")
+
+            # --- Reinsert dropped coefficients (zeros where constants were) ---
+            full_pred = np.zeros(mask.shape, dtype=float)
+            full_pred[mask] = pred_vec
+
+            # --- Undo flattening: split cos/sin ---
+            n_total = full_pred.shape[0]
+            n_half = n_total // 2
+            cos_coeffs = full_pred[:n_half]
+            sin_coeffs = full_pred[n_half:]
+
+            # Determine trimmed size
+            kept_size = int(grid_size * trim_fraction)
+            kspace_shape = (kept_size, kept_size, kept_size)
+
+            cos_grid = cos_coeffs.reshape(kspace_shape)
+            sin_grid = sin_coeffs.reshape(kspace_shape)
+            kspace_pred = cos_grid + 1j * sin_grid
+
+            # --- Pad back to full grid_size ---
+            kspace_full = np.zeros((grid_size, grid_size, grid_size), dtype=np.complex128)
+            start = (grid_size - kept_size) // 2
+            end = start + kept_size
+            kspace_full[start:end, start:end, start:end] = kspace_pred
+
+            # --- Save k-space to file ---
+            kspace_file = self.predictions_output_path / f"{sim_id}.pkl"
+            with open(kspace_file, "wb") as f:
+                pickle.dump(kspace_full, f)
+
+            # --- Inverse FFT to voxel grid ---
+            voxel_grid = np.fft.ifftn(np.fft.ifftshift(kspace_full))
+            voxel_grid = np.real(voxel_grid)
+
+            # --- Convert to PyVista ImageData for correct physical coordinates ---
+            voxel_pv = pv.ImageData()
+            voxel_pv.dimensions = voxel_grid.shape  # (nx, ny, nz)
+            voxel_pv.spacing = (1/grid_size, 1/grid_size, 1/grid_size)  # scale to 0→1 domain
+            voxel_pv.origin = (0, 0, 0)
+            voxel_pv["values"] = voxel_grid.flatten(order="F")  # column-major flatten
+
+            # --- Visualize ---
+            plotter = pv.Plotter()
+            plotter.add_volume(voxel_pv, opacity="sigmoid", shade=True)
+            plotter.show_grid()
+            plotter.show()
 
     def run_k_fold_validation(self):
         #kf = KFold(n_splits=self.n_splits, shuffle=False)  # , random_state=self.random_state)

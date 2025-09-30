@@ -23,47 +23,47 @@ class Mesh3d:
     def __init__(self,
                  finite_element: LagrangeElement,
                  msh_file=None,
-                 grid_size=None,
-                 box_size=None,
+                 #grid_size=None,
+                 #box_size=None,
                  #source_center=None,
                  #source_radius=None,
                  outer_density=None,
                  outer_speed=None,
                  inclusion_density=None,
                  inclusion_speed=None,
-                 inclusion_center=None,
-                 inclusion_scaling=None,
-                 inclusion_semi_major_axis_direction=None,
+                 #inclusion_center=None,
+                 #inclusion_scaling=None,
+                 #inclusion_semi_major_axis_direction=None,
                  ):
         if None not in (msh_file,
-                        grid_size,
-                        box_size,
+                        #grid_size,
+                        #box_size,
                         #source_center,
                         #source_radius,
                         outer_density,
                         outer_speed,
                         inclusion_density,
                         inclusion_speed,
-                        inclusion_center,
-                        inclusion_scaling,
-                        inclusion_semi_major_axis_direction,
+                        #inclusion_center,
+                        #inclusion_scaling,
+                        #inclusion_semi_major_axis_direction,
                         ):
             self.msh_file = msh_file
             self.reference_element = finite_element
             self.reference_element_operators = ReferenceElementOperators(self.reference_element)
             self.dim = self.reference_element.d
             self.n = self.reference_element.n  # polynomial order
-            self.grid_size = grid_size
-            self.box_size = box_size
+            #self.grid_size = grid_size
+            #self.box_size = box_size
             #self.source_center = source_center
             #self.source_radius = source_radius
             self.outer_density = outer_density
             self.outer_speed = outer_speed
             self.inclusion_density = inclusion_density
             self.inclusion_speed = inclusion_speed
-            self.inclusion_center = inclusion_center
-            self.inclusion_scaling = inclusion_scaling
-            self.inclusion_semi_major_axis_direction = inclusion_semi_major_axis_direction
+            #self.inclusion_center = inclusion_center
+            #self.inclusion_scaling = inclusion_scaling
+            #self.inclusion_semi_major_axis_direction = inclusion_semi_major_axis_direction
         else:
             raise ValueError("Invalid Mesh3d initialization: must provide all geometric parameters.")
 

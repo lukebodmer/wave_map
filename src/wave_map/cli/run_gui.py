@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
-import panel as pn
-from wave_map.gui.user_interface import UserInterface
+from wave_map.gui.trame_user_interface import TrameGui
 
-# Create the Panel app (this is what panel serve will use)
-app = UserInterface(outputs_dir='data/simulation_batch_data').show()
 
-# Required main() function for pyproject.toml script entry
 def main():
     """Entry point for script usage"""
-    pn.serve(app)
+    app = TrameGui()
+    app.server.start(port=1234, open_browser=True)
+
+
+if __name__ == "__main__":
+    main()

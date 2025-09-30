@@ -48,6 +48,7 @@ class EmulatorSetup:
     def _create_results_validator(self):
         """Instantiate the ResultsValidator with the loaded data and logger."""
         self.validator = ResultsValidator(
+            batch_name=self.batch_name,
             inputs=self.inputs,
             outputs=self.outputs,
             simulation_ids=self.simulation_ids,
@@ -57,4 +58,5 @@ class EmulatorSetup:
 
     def run_validation(self):
         """Run k-fold cross-validation via the ResultsValidator."""
-        self.validator.run_k_fold_validation()
+        #self.validator.run_k_fold_validation()
+        self.validator.run_simple_validation()

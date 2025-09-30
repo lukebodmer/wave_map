@@ -43,7 +43,7 @@ class SimulationSetup:
         self.base_output_path = Path(f"{BATCH_DATA_DIR}/{batch_name}")
         self.base_simulations_path = self.base_output_path / "simulations"
         self.mesh_base_output_path = self.base_output_path / "meshes"
-        self.cfg = self._load_config()
+        self.config = self._load_config()
         self.output_path = self._resolve_output_path()
         self.logger = Logger(log_path=self.output_path / "log.txt", name="simlog")
         self._prepare_output_dirs()
@@ -61,17 +61,17 @@ class SimulationSetup:
         )
 
     def create_mesh(self):
-        cfg = self.cfg
+        #config = self.config
         # create a finite element
         finite_element = LagrangeElement(
             d=3,
-            n=cfg.solver.polynomial_order
+            n=self.config.solver.polynomial_order
         )
 
-        if cfg.mesh.msh_file is not None:
+        if self.config.mesh.msh_file is not None:
             # if the gmsh file name is specified, get the mesh from the
             # common mesh directory
-            filename = Path(cfg.mesh.msh_file)
+            filename = Path(self.config.mesh.msh_file)
             self.mesh_directory = Path(f"data/common_meshes/{filename.stem}")
             msh_file = self.mesh_directory / filename
             mesh_path = self.mesh_directory / "mesh.pkl"
@@ -83,17 +83,17 @@ class SimulationSetup:
         mesh = Mesh3d(
             finite_element=finite_element,
             msh_file=msh_file,
-            grid_size=cfg.mesh.grid_size,
-            box_size=cfg.mesh.box_size,
+            #grid_size=cfg.mesh.grid_size,
+            #box_size=cfg.mesh.box_size,
             #source_centers=cfg.source.centers,
             #source_radii=cfg.source.radii,
-            outer_density=cfg.material.outer_density,
-            outer_speed=cfg.material.outer_wave_speed,
-            inclusion_density=cfg.material.inclusion_density,
-            inclusion_speed=cfg.material.inclusion_wave_speed,
-            inclusion_center=cfg.mesh.inclusion_center,
-            inclusion_scaling=cfg.mesh.inclusion_scaling,
-            inclusion_semi_major_axis_direction=cfg.mesh.inclusion_semi_major_axis_direction,
+            outer_density=self.config.material.outer_density,
+            outer_speed=self.config.material.outer_wave_speed,
+            inclusion_density=self.config.material.inclusion_density,
+            inclusion_speed=self.config.material.inclusion_wave_speed,
+            #inclusion_center=cfg.mesh.inclusion_center,
+            #inclusion_scaling=cfg.mesh.inclusion_scaling,
+            #inclusion_semi_major_axis_direction=cfg.mesh.inclusion_semi_major_axis_direction,
         )
 
         # save mesh data needed for visualization
@@ -133,14 +133,13 @@ class SimulationSetup:
             pickle.dump(mesh_data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def get_mesh_hash(self):
-        parameter_file = self.config_path
-        with open(parameter_file, "rb") as f:
+        # get the simulation parameters
+        with open(self.config_path, "rb") as f:
             simulation_parameters = tomli.load(f)
-
-        parser = SimulationInputParser.from_toml(simulation_parameters)
+        parsed_parameters = SimulationInputParser.from_toml(simulation_parameters)
 
         hash_functions = ParameterHashFunctions()
-        mesh_hash = hash_functions.get_mesh_hash(parser)
+        mesh_hash = hash_functions.get_mesh_hash(parsed_parameters)
         return mesh_hash
 
     def _get_mesh_directory(self):
@@ -169,7 +168,7 @@ class SimulationSetup:
 
     def build_simulator(self):
         # get parameters from parameters.toml
-        cfg = self.cfg
+        cfg = self.config
 
         # get mesh
         mesh = self.create_mesh()

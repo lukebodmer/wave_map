@@ -986,7 +986,6 @@ class PyRobustGaSP(object):
 
         
         return output_list
-        
     
     def train_ppgasp(self, task):
         """

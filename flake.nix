@@ -60,6 +60,10 @@
           pythonPackages.sklearn-compat
           pythonPackages.tomli
           pythonPackages.toml
+	  pythonPackages.trame
+	  pythonPackages.trame-components
+	  pythonPackages.trame-vtk
+	  pythonPackages.trame-vuetify
 	  pythonPackages.pytorch-bin
         ];
 

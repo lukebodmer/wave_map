@@ -233,7 +233,6 @@ class Visualizer:
             render_points_as_spheres=True
         )
 
-
     def add_cells(self, cell_list):
         """Highlight specific cells on the mesh."""
         import numpy as np

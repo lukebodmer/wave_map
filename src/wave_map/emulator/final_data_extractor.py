@@ -1,5 +1,5 @@
 import pickle
-import pandas as pd
+import pyvista as pv
 from pathlib import Path
 import toml
 import numpy as np
@@ -39,6 +39,102 @@ class FinalDataExtractor:
         compressed = np.sign(normalized) * (np.abs(normalized) ** gamma)
         return compressed
 
+    def post_process_input(
+        self,
+        input_features,
+        grid_size: int = 64,
+        trim_fraction: float = 0.5,
+       ) -> np.ndarray:
+        """
+        Convert inclusion parameters into a real-valued feature vector.
+
+        Steps:
+        1. Render cubes into a 3D voxel grid (unit cube domain).
+        2. Visualize voxel grid with PyVista.
+        3. Compute FFT of voxel grid.
+        4. Optionally trim high frequencies by keeping only a central cube.
+        5. Split into cos/sin coefficients.
+        6. Flatten + concatenate into a single real-valued vector.
+        """
+        density, wave_speed, cube_centers, cube_widths = input_features
+
+        # --- Step 1: voxel grid ---
+        grid = np.zeros((grid_size, grid_size, grid_size), dtype=np.float32)
+
+        # voxel coordinates from 0 → 1
+        x = np.linspace(0, 1, grid_size, endpoint=False)
+        y = np.linspace(0, 1, grid_size, endpoint=False)
+        z = np.linspace(0, 1, grid_size, endpoint=False)
+        X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
+
+        for center, width in zip(cube_centers, cube_widths):
+            cx, cy, cz = center
+            hw = width / 2  # half-width
+            mask = (
+                (np.abs(X - cx) <= hw) &
+                (np.abs(Y - cy) <= hw) &
+                (np.abs(Z - cz) <= hw)
+            )
+            grid[mask] = 1.0
+
+        # embed material properties
+        grid *= density# * wave_speed
+
+        # --- Step 2: visualize voxel grid ---
+        #plotter = pv.Plotter()
+
+        ## Instead of passing a raw ndarray to add_volume, create an ImageData
+        #grid_data = pv.ImageData()
+        #grid_data.dimensions = grid.shape  # (nx, ny, nz)
+        #grid_data.spacing = (1/grid_size, 1/grid_size, 1/grid_size)  # so full domain is 0→1
+        #grid_data.origin = (0, 0, 0)
+        #grid_data["values"] = grid.flatten(order="F")  # column-major flatten
+
+        #plotter.add_volume(grid_data, opacity="sigmoid", shade=True)
+        #plotter.show_grid()
+        #plotter.show()
+
+        # --- Step 3: FFT ---
+        kspace = np.fft.fftn(grid)
+        kspace = np.fft.fftshift(kspace)  # shift zero-freq to center
+
+        # --- Step 4: trim high frequencies ---
+        if not (0 < trim_fraction <= 1.0):
+            raise ValueError("trim_fraction must be in (0,1].")
+
+        # --- Step 2b: visualize k-space magnitude ---
+        #kspace_magnitude = np.abs(kspace)
+        #kspace_grid = pv.ImageData()
+        #kspace_grid.dimensions = kspace_magnitude.shape
+        #kspace_grid.spacing = (1/grid_size, 1/grid_size, 1/grid_size)  # match voxel coordinates
+        #kspace_grid.origin = (0, 0, 0)
+        #kspace_grid["values"] = kspace_magnitude.flatten(order="F")
+        #plotter = pv.Plotter()
+        #plotter.add_volume(kspace_grid,
+        #                   #opacity="sigmoid",
+        #                   shade=True,
+        #                   cmap="viridis")
+        #plotter.show_grid()
+        #plotter.show()
+
+        # trim K space
+        #keep = int(grid_size * trim_fraction)
+        #start = (grid_size - keep) // 2
+        #end = start + keep
+        #kspace_trimmed = kspace[start:end, start:end, start:end]
+
+        # --- Step 5: split cos/sin ---
+        cos_coeffs = np.real(kspace).flatten()
+        sin_coeffs = np.imag(kspace).flatten()
+
+        # --- Step 6: concatenate ---
+        features = np.concatenate([cos_coeffs, sin_coeffs])
+
+        # Normalize
+        #features /= np.max(np.abs(features)) + 1e-12
+
+        return features
+
     def post_process_output(self, sensor_data: np.ndarray) -> np.ndarray:
         """
         Post-process sensor_data matrix.
@@ -56,12 +152,12 @@ class FinalDataExtractor:
         # trim more timesteps from start
         #processed_data = processed_data[::6, :]
         #processed_data = np.delete(processed_data, slice(99, 125), axis=0)
-        processed_data = processed_data[:, 200:]
+        processed_data = processed_data[:, 50:]
 
         # downsample
         processed_data = processed_data[:, ::self.downsample_factor]
         #processed_data = self.log_compress(processed_data)
-        processed_data = self.power_compress_rows(processed_data)
+        #processed_data = self.power_compress_rows(processed_data)
 
         # normalize each row by its maximum (avoid division by zero)
         #row_max = processed_data.max(axis=1, keepdims=True)
@@ -74,7 +170,10 @@ class FinalDataExtractor:
         """Load all simulations' parameters and sensor data."""
         inputs, outputs, simulation_ids = [], [], []
 
+        count = 0
         for sim_dir in self.batch_dir.iterdir():
+            if count >= 10:
+                break  # Stop after 100 files
             if sim_dir.is_dir():
                 param_file = sim_dir / "parameters.toml"
                 sensor_file = sim_dir / "final_sensor_data.pkl"
@@ -85,13 +184,19 @@ class FinalDataExtractor:
                 # --- Load parameter file ---
                 params = toml.load(param_file)
 
+                #input_features = [
+                #    params["material"]["inclusion_density"],
+                #    params["material"]["inclusion_wave_speed"],
+                #    #params["material"]["inclusion_material_id"],
+                #    params["mesh"]["inclusion_scaling"][0],
+                #    params["mesh"]["inclusion_scaling"][1],
+                #    *params["mesh"]["inclusion_semi_major_axis_direction"],
+                #]
                 input_features = [
                     params["material"]["inclusion_density"],
                     params["material"]["inclusion_wave_speed"],
-                    #params["material"]["inclusion_material_id"],
-                    params["mesh"]["inclusion_scaling"][0],
-                    params["mesh"]["inclusion_scaling"][1],
-                    *params["mesh"]["inclusion_semi_major_axis_direction"],
+                    params["mesh"]["cube_centers"],
+                    params["mesh"]["cube_widths"],
                 ]
 
                 # --- Load sensor data ---
@@ -102,10 +207,14 @@ class FinalDataExtractor:
                 sensor_data = cp.asnumpy(sensor_data)
                 # --- Post-process output ---
                 processed_output = self.post_process_output(sensor_data)
+                processed_input = self.post_process_input(input_features)
 
-                inputs.append(input_features)
+                #inputs.append(input_features)
+                inputs.append(processed_input)
                 outputs.append(processed_output)
                 simulation_ids.append(sim_dir.name)
+
+            #count += 1  # Increment counter
 
         X = np.array(inputs)
         Y = np.array(outputs)
