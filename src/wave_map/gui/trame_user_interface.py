@@ -380,12 +380,14 @@ class TrameGui(TrameApp):
                     # ----------------------
                     # Tabs header
                     # ----------------------
-                    with v3.VTabs(v_model=(v_model_tab, "image")):
+                    with v3.VTabs(
+                        v_model=(v_model_tab, "image"),
+                        centered=True,
+                        style="max-width: 600px; margin: 0 auto;"
+                    ):
                         v3.VTab("Image", value="image")
                         v3.VTab("Simulation", value="simulation")
-                        v3.VTab("Data", value="data")
-    
-                    # ----------------------
+                        v3.VTab("Data", value="data")                    # ----------------------
                     # Tabs content
                     # ----------------------
                     with v3.VWindow(
