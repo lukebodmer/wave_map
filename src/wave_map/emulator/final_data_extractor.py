@@ -1,5 +1,4 @@
 import pickle
-import pyvista as pv
 from pathlib import Path
 import toml
 import numpy as np
@@ -80,58 +79,23 @@ class FinalDataExtractor:
         # embed material properties
         grid *= density# * wave_speed
 
-        # --- Step 2: visualize voxel grid ---
-        #plotter = pv.Plotter()
-
-        ## Instead of passing a raw ndarray to add_volume, create an ImageData
-        #grid_data = pv.ImageData()
-        #grid_data.dimensions = grid.shape  # (nx, ny, nz)
-        #grid_data.spacing = (1/grid_size, 1/grid_size, 1/grid_size)  # so full domain is 0→1
-        #grid_data.origin = (0, 0, 0)
-        #grid_data["values"] = grid.flatten(order="F")  # column-major flatten
-
-        #plotter.add_volume(grid_data, opacity="sigmoid", shade=True)
-        #plotter.show_grid()
-        #plotter.show()
-
-        # --- Step 3: FFT ---
+        # --- Step 2: FFT ---
         kspace = np.fft.fftn(grid)
         kspace = np.fft.fftshift(kspace)  # shift zero-freq to center
 
-        # --- Step 4: trim high frequencies ---
+        # --- Step 3: trim high frequencies ---
         if not (0 < trim_fraction <= 1.0):
             raise ValueError("trim_fraction must be in (0,1].")
 
-        # --- Step 2b: visualize k-space magnitude ---
-        #kspace_magnitude = np.abs(kspace)
-        #kspace_grid = pv.ImageData()
-        #kspace_grid.dimensions = kspace_magnitude.shape
-        #kspace_grid.spacing = (1/grid_size, 1/grid_size, 1/grid_size)  # match voxel coordinates
-        #kspace_grid.origin = (0, 0, 0)
-        #kspace_grid["values"] = kspace_magnitude.flatten(order="F")
-        #plotter = pv.Plotter()
-        #plotter.add_volume(kspace_grid,
-        #                   #opacity="sigmoid",
-        #                   shade=True,
-        #                   cmap="viridis")
-        #plotter.show_grid()
-        #plotter.show()
+        # --- Step 4: split cos/sin ---
+        real_kspace = np.real(kspace).flatten()
+        imaginary_kspace = np.imag(kspace).flatten()
+        #magnitude = np.abs(kspace).flatten()
+        #phase = np.angle(kspace).flatten()
 
-        # trim K space
-        #keep = int(grid_size * trim_fraction)
-        #start = (grid_size - keep) // 2
-        #end = start + keep
-        #kspace_trimmed = kspace[start:end, start:end, start:end]
-
-        # --- Step 5: split cos/sin ---
-        cos_coeffs = np.real(kspace).flatten()
-        sin_coeffs = np.imag(kspace).flatten()
-
-        # --- Step 6: concatenate ---
-        features = np.concatenate([cos_coeffs, sin_coeffs])
-
-        # Normalize
-        #features /= np.max(np.abs(features)) + 1e-12
+        # --- Step 5: concatenate ---
+        features = np.concatenate([real_kspace, imaginary_kspace])
+        #features = np.concatenate([magnitude, phase])
 
         return features
 
@@ -142,27 +106,21 @@ class FinalDataExtractor:
         - Downsample each row (time series) by self.downsample_factor.
         - Flatten into a 1D array.
         """
+        # get data
         processed_data = sensor_data
-        # filter out small noise
-        #processed[abs(processed) < 0.0000001] = 0
 
         # cut off first timestep
         processed_data = processed_data[:, 1:]
 
         # trim more timesteps from start
-        #processed_data = processed_data[::6, :]
-        #processed_data = np.delete(processed_data, slice(99, 125), axis=0)
         processed_data = processed_data[:, 50:]
 
         # downsample
         processed_data = processed_data[:, ::self.downsample_factor]
+
+        # compress audio
         #processed_data = self.log_compress(processed_data)
         #processed_data = self.power_compress_rows(processed_data)
-
-        # normalize each row by its maximum (avoid division by zero)
-        #row_max = processed_data.max(axis=1, keepdims=True)
-        #row_max[row_max == 0] = 1.0  # prevent divide-by-zero
-        #processed_data = processed_data / row_max
 
         return processed_data.flatten()
 
@@ -218,12 +176,5 @@ class FinalDataExtractor:
 
         X = np.array(inputs)
         Y = np.array(outputs)
-
-        # --- Save to CSV ---
-        #inputs_df = pd.DataFrame(X, index=simulation_ids)
-        #outputs_df = pd.DataFrame(Y, index=simulation_ids)
-
-        #inputs_df.to_csv(self.project_root / f"data/{self.batch_name}_inputs.csv")
-        #outputs_df.to_csv(self.project_root / f"data/{self.batch_name}_outputs.csv")
 
         return X, Y, simulation_ids

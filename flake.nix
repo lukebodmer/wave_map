@@ -62,6 +62,7 @@
           pythonPackages.toml
 	  pythonPackages.trame
 	  pythonPackages.trame-components
+	  pythonPackages.trame-matplotlib
 	  pythonPackages.trame-vtk
 	  pythonPackages.trame-vuetify
 	  pythonPackages.pytorch-bin

@@ -100,7 +100,7 @@ class ResultsValidator:
                 f"out of {Y.shape[1]} total."
             )
             if len(dropped) > 0:
-                self.logger.debug(f"{log_prefix} Constant column indices: {dropped.tolist()}")
+                self.logger.info(f"{log_prefix} Constant column indices: {dropped.tolist()}")
         else:
             mask = ref_mask
         return Y[:, mask], mask
@@ -123,28 +123,36 @@ class ResultsValidator:
         y_train, mask = self._remove_constant_columns(y_train)
         y_test, _ = self._remove_constant_columns(y_test, ref_mask=mask)
 
-        # --- Train PPE ---
-        self.logger.info("...training PPE model")
-        P_rgasp = PyRobustGaSP()
-        task = P_rgasp.create_task(
-            X_train,
-            y_train,
-            isotropic=True,
-            #optimization="nelder-mead",
-            #num_initial_values=10,
-            #nugget_est=True
-        )
-
-        #with open(os.devnull, "w") as fnull:
-        #    with redirect_stdout(fnull), redirect_stderr(fnull):
-        #        model = P_rgasp.train_ppgasp(task)
-        model = P_rgasp.train_ppgasp(task)
-
-        # save model
         model_file = self.ppe_output_path / "parallel_partial_emulator.pkl"
-        with open(model_file, "wb") as f:
-            pickle.dump(model, f)
-            self.logger.info(f"Saved trained PPE model to: {model_file}")
+        P_rgasp = PyRobustGaSP()
+
+        # --- Train PPE ---
+        if model_file.exists():
+            # --- Load model ---
+            self.logger.info(f"Loading existing PPE model from: {model_file}")
+            with open(model_file, "rb") as f:
+                model = pickle.load(f)
+        else:
+            self.logger.info("...training PPE model")
+            task = P_rgasp.create_task(
+                X_train,
+                y_train,
+                isotropic=True,
+                #optimization="nelder-mead",
+                #num_initial_values=10,
+                #nugget_est=True
+            )
+
+            #with open(os.devnull, "w") as fnull:
+            #    with redirect_stdout(fnull), redirect_stderr(fnull):
+            #        model = P_rgasp.train_ppgasp(task)
+            model = P_rgasp.train_ppgasp(task)
+
+            # save model
+            model_file = self.ppe_output_path / "parallel_partial_emulator.pkl"
+            with open(model_file, "wb") as f:
+                pickle.dump(model, f)
+                self.logger.info(f"Saved trained PPE model to: {model_file}")
 
         # --- Predict ---
         self.logger.info("...predicting on hold-out data")
@@ -159,46 +167,56 @@ class ResultsValidator:
             full_pred[mask] = pred_vec
 
             # --- Undo flattening: split cos/sin ---
+            kspace_shape = (grid_size, grid_size, grid_size)
+
             n_total = full_pred.shape[0]
             n_half = n_total // 2
+
             cos_coeffs = full_pred[:n_half]
             sin_coeffs = full_pred[n_half:]
-
-            # Determine trimmed size
-            kept_size = int(grid_size * trim_fraction)
-            kspace_shape = (kept_size, kept_size, kept_size)
-
             cos_grid = cos_coeffs.reshape(kspace_shape)
             sin_grid = sin_coeffs.reshape(kspace_shape)
+
+            # Determine trimmed size
+            #kept_size = int(grid_size * trim_fraction)
+            #kspace_shape = (kept_size, kept_size, kept_size)
+
+            # Split into magnitude and phase
+            #magnitude = full_pred[:n_half].reshape(kspace_shape)
+            #phase = full_pred[n_half:].reshape(kspace_shape)
+
+            # Reconstruct complex k-space
             kspace_pred = cos_grid + 1j * sin_grid
+            #kspace_pred = magnitude * np.exp(1j * phase)
 
             # --- Pad back to full grid_size ---
-            kspace_full = np.zeros((grid_size, grid_size, grid_size), dtype=np.complex128)
-            start = (grid_size - kept_size) // 2
-            end = start + kept_size
-            kspace_full[start:end, start:end, start:end] = kspace_pred
+            #kspace_full = np.zeros((grid_size, grid_size, grid_size), dtype=np.complex128)
+            #start = (grid_size - kept_size) // 2
+            #end = start + kept_size
+            #kspace_full[start:end, start:end, start:end] = kspace_pred
 
             # --- Save k-space to file ---
             kspace_file = self.predictions_output_path / f"{sim_id}.pkl"
             with open(kspace_file, "wb") as f:
-                pickle.dump(kspace_full, f)
+                pickle.dump(kspace_pred, f)
 
             # --- Inverse FFT to voxel grid ---
-            voxel_grid = np.fft.ifftn(np.fft.ifftshift(kspace_full))
-            voxel_grid = np.real(voxel_grid)
+            #voxel_grid = np.fft.ifftn(np.fft.ifftshift(kspace_pred))
+            #voxel_grid = np.real(voxel_grid)
 
             # --- Convert to PyVista ImageData for correct physical coordinates ---
-            voxel_pv = pv.ImageData()
-            voxel_pv.dimensions = voxel_grid.shape  # (nx, ny, nz)
-            voxel_pv.spacing = (1/grid_size, 1/grid_size, 1/grid_size)  # scale to 0→1 domain
-            voxel_pv.origin = (0, 0, 0)
-            voxel_pv["values"] = voxel_grid.flatten(order="F")  # column-major flatten
+            #voxel_pv = pv.ImageData()
+            #voxel_pv.dimensions = voxel_grid.shape  # (nx, ny, nz)
+            #voxel_pv.spacing = (1/grid_size, 1/grid_size, 1/grid_size)  # scale to 0→1 domain
+            #voxel_pv.origin = (0, 0, 0)
+            #voxel_pv["values"] = voxel_grid.flatten(order="F")  # column-major flatten
 
             # --- Visualize ---
-            plotter = pv.Plotter()
-            plotter.add_volume(voxel_pv, opacity="sigmoid", shade=True)
-            plotter.show_grid()
-            plotter.show()
+            #plotter = pv.Plotter()
+            #plotter.add_volume(voxel_pv, opacity="sigmoid", shade=True)
+            #plotter.show_grid()
+            #plotter.show()
+
 
     def run_k_fold_validation(self):
         #kf = KFold(n_splits=self.n_splits, shuffle=False)  # , random_state=self.random_state)

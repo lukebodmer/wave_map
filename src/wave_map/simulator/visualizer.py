@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 
 
 class Visualizer:
-    def __init__(self, mesh_data, data, grid=True):
-        # create plotter
-        self.plotter = pv.Plotter(off_screen=False)
+    def __init__(self, mesh_data, data, plotter=None, grid=True):
+        # create plotter or use existing plotter
+        self.plotter = plotter or pv.Plotter(off_screen=False)
 
         # set visualizer data
         self.set_data(mesh_data, data)
@@ -72,7 +72,7 @@ class Visualizer:
             self.cell_to_vertices = self.mesh["cell_to_vertices"]
             self.face_node_indices = self.mesh["reference_element"].face_node_indices
             self.boundary_face_node_indices = self.mesh["boundary_face_node_indices"]
-        
+
         self.fields = data["fields"]
         self.p = self.fields["p"]
         self.u = self.fields["u"]
@@ -91,7 +91,7 @@ class Visualizer:
         self.current_time_step = data["current_time_step"]
         self.output_path = data.get("output_path", "./")
         self.save_image_interval = data["save_image_interval"]
-        self.save_data_interval  = data["save_data_interval"]
+        self.save_data_interval = data["save_data_interval"]
         self.save_points_interval = data["save_points_interval"]
         self.save_energy_interval = data["save_energy_interval"]
         self.sensor_coordinates = data["sensor_coordinates"]
@@ -197,7 +197,7 @@ class Visualizer:
         )
 
     def add_cell_nodes(self, cell_list):
-        # Extract x, y, z coordinates for the nodes in the specified cells 
+        # Extract x, y, z coordinates for the nodes in the specified cells
         x = self.x[:, cell_list].flatten()
         y = self.y[:, cell_list].flatten()
         z = self.z[:, cell_list].flatten()
@@ -220,11 +220,11 @@ class Visualizer:
         x = self._to_cpu(self.x.ravel(order="F"))[boundary_nodes]
         y = self._to_cpu(self.y.ravel(order="F"))[boundary_nodes]
         z = self._to_cpu(self.z.ravel(order="F"))[boundary_nodes]
-        
+
         # Stack into boundary nodal points
         import numpy as np
         boundary_points_to_plot = np.column_stack((x, y, z))
-        
+
         # Add the boundary points to the plot
         self.plotter.add_points(
             boundary_points_to_plot,
@@ -339,7 +339,6 @@ class Visualizer:
             mag=0.05,
             color='red'
         )
- 
 
     def add_cell_averages(self, field):
         """
@@ -391,32 +390,68 @@ class Visualizer:
             smooth_shading=True
         )
 
-    def add_wave_speed(self):
-        """ plot the wavespeed of each element """
-        # Construct a cells object to make a pyvista unstructuredGrid
-        cells = cp.zeros(self.num_cells * 5, dtype='int')
-        index = 0
-        for i in range(self.num_cells * 5):
-            if i % 5 == 0:
-                cells[i] = 4
-            else:
-                cells[i] = index
-                index += 1
-        cell_types = cp.repeat(cp.array([pv.CellType.TETRA]), self.num_cells)
-        points = self.vertex_coordinates[self.cell_to_vertices.ravel()]
+    def add_image_prediction(self, kspace_data):
+        import numpy as np
+
+        voxel_pred = np.fft.ifftn(np.fft.ifftshift(kspace_data))
+        voxel_pred = np.real(voxel_pred)
+        pv_grid = pv.ImageData()
+        pv_grid.dimensions = voxel_pred.shape
+        pv_grid.spacing = (1/voxel_pred.shape[0], 1/voxel_pred.shape[1], 1/voxel_pred.shape[2])
+        pv_grid.origin = (0, 0, 0)
+        pv_grid["values"] = voxel_pred.flatten(order="F")
+        self.plotter.add_volume(
+            pv_grid,
+            opacity="sigmoid",
+            shade=True,
+            clim=[0, 0.9],
+               )
+
+
+    def add_wave_speed(self, resolution=(100, 100, 100)):
+        """
+        Visualize the wave speed field using volume rendering.
     
-        # create a pyvista unstructured grid
-        grid = pv.UnstructuredGrid(
-            cells.get() if hasattr(cells, "get") else cells,
-            cell_types.get() if hasattr(cell_types, "get") else cell_types,
-            points.get() if hasattr(points, "get") else points
+        Parameters
+        ----------
+        resolution : tuple of int, optional
+            Dimensions of the resampling image grid (nx, ny, nz).
+            Larger = higher quality but slower rendering.
+        """
+        # --- 1. Build tetrahedral grid from mesh ---
+        import numpy as np
+
+        num_cells = self.num_cells
+        cell_conn = np.hstack(
+            [np.full((num_cells, 1), 4), self._to_cpu(self.cell_to_vertices)]
+        ).ravel()
+        cell_types = np.full(num_cells, pv.CellType.TETRA, dtype=np.uint8)
+        points = self._to_cpu(self.vertex_coordinates)
+
+        grid = pv.UnstructuredGrid(cell_conn, cell_types, points)
+        grid.cell_data["speed"] = self._to_cpu(self.speed)
+
+        # --- 2. Create a uniform image grid covering the domain ---
+        bounds = grid.bounds  # (xmin, xmax, ymin, ymax, zmin, zmax)
+        nx, ny, nz = resolution
+        image = pv.ImageData()
+        image.dimensions = resolution
+        image.origin = (bounds[0], bounds[2], bounds[4])
+        image.spacing = (
+            (bounds[1] - bounds[0]) / (nx - 1),
+            (bounds[3] - bounds[2]) / (ny - 1),
+            (bounds[5] - bounds[4]) / (nz - 1),
         )
-           
-        # add to plotter
-        self.plotter.add_mesh(
-            grid,
-            scalars=self.speed.get(),
-            opacity=0.05
+
+        # --- 3. Interpolate wave speed onto the image grid ---
+        sampled = image.sample(grid)
+
+        # --- 4. Volume render the sampled field ---
+        self.plotter.add_volume(
+            sampled,
+            scalars="speed",
+            cmap="viridis",
+            opacity="sigmoid",   # smooth transfer function
         )
 
     def add_mesh(self):
@@ -626,7 +661,7 @@ class Visualizer:
         ax.plot(time_array, self._to_cpu(self.kinetic_data[:num_steps]), marker='x', label='KE')
         ax.plot(time_array, self._to_cpu(self.potential_data[:num_steps]), marker='*', label='PE')
         ax.legend()
-        ax.set_title(f'Global Energy (reflective boundary conditions)')
+        ax.set_title('Global Energy (reflective boundary conditions)')
         ax.set_ylabel('Energy')
         ax.set_xlabel('Time')
         ax.grid(True, alpha=0.3)
@@ -634,7 +669,6 @@ class Visualizer:
             plt.show()
             return
         return fig
-
 
     def plot_tracked_points(self, show=False):
         """
@@ -645,7 +679,7 @@ class Visualizer:
         if not self.tracked_fields:
             print("No tracked field data to plot.")
             return
-    
+
         interval = self.data['save_points_interval']
         dt = self.dt
         t = self.current_time_step
@@ -706,16 +740,16 @@ class Visualizer:
         data_matrix = self._to_cpu(pressure_entry["data"][:, :num_steps])  # (n_points, time)
         points = pressure_entry["points"]
 
-        fig, ax = plt.subplots(figsize=(12, 12))
+        fig, ax = plt.subplots()#figsize=(3, 3))
         #vmax = np.abs(data_matrix).max()
         vmax = 1.000
         #vmax = 1e-7
         vmin = -vmax
 
         cax = ax.imshow(data_matrix, aspect='auto', cmap='seismic', origin='lower', vmin=vmin, vmax=vmax)
-        n_rows = data_matrix.shape[0]
-        for i in range(1, n_rows):
-            ax.axhline(i - 0.5, color='black', linewidth=0.5, alpha=0.3)
+        #n_rows = data_matrix.shape[0]
+        #for i in range(1, n_rows):
+        #    ax.axhline(i - 0.5, color='black', linewidth=0.5, alpha=0.3)
 
         ax.set_ylabel("Sensor Index")
         ax.set_xlabel("Time Step Index")
@@ -728,7 +762,7 @@ class Visualizer:
 
         fig.colorbar(cax, ax=ax, fraction=0.03, pad=0.01, shrink=0.8)
     
-        plt.tight_layout()
+        #plt.tight_layout()
     
         if show:
             plt.show()
@@ -752,7 +786,7 @@ class Visualizer:
         fig, ax = plt.subplots()
         ax.plot(time_array, source_data, marker='o', label='Source')
         ax.legend()
-        ax.set_title(f'Source Pressure')
+        ax.set_title('Source Pressure')
         ax.set_ylabel('Pressure')
         ax.set_xlabel('Time')
         ax.grid(True, alpha=0.3)
