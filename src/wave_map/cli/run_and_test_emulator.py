@@ -1,5 +1,5 @@
 import argparse
-from wave_map.emulator.emulator_setup import EmulatorSetup
+from wave_map.model_testers.model_tester_setup import ModelTesterSetup
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -21,8 +21,9 @@ def main(argv=None):
     args = parse_args(argv)
 
     # Setup the emulator and run validation
-    emulator_setup = EmulatorSetup(batch_name=args.batch_name)
+    emulator_setup = ModelTesterSetup(batch_name=args.batch_name)
     emulator_setup.run_validation()
+
 
 if __name__ == "__main__":
     main()

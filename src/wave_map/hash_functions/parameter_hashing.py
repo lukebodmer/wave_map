@@ -1,5 +1,6 @@
 import json
 import hashlib
+import pickle
 
 
 class ParameterHashFunctions:
@@ -25,4 +26,13 @@ class ParameterHashFunctions:
         Create a short hash from the simulation parameter file at the given path.
         """
         with open(path, "rb") as f:
-            return hashlib.sha1(f.read()).hexdigest()[:8]
+            return hashlib.sha1(f.read()).hexdigest()[:10]
+
+    def get_inversion_model_hash(self, model):
+        """
+        Compute a short deterministic hash for a model dictionary.
+        Works for arbitrary nested structures (NumPy arrays included).
+        Turns pickle binary representation into a hash
+        """
+        data = pickle.dumps(model, protocol=pickle.HIGHEST_PROTOCOL)
+        return hashlib.sha1(data).hexdigest()[:10]

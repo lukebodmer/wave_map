@@ -111,10 +111,10 @@ class LinearAcoustics:
         # set fields
         if kind == "gaussian":
             # Gaussian pulse centered at (x0, y0, z0)
-            center=(0.1250, 0.1250, 0.1250)
-            sigma=0.01
+            center = (0.1250, 0.1250, 0.1250)
+            sigma = 0.01
             x0, y0, z0 = center
-            # define pressure field to be a gaussian pulse 
+            # define pressure field to be a gaussian pulse
             amplitude = 0.5
             self.p = amplitude*np.exp(-((x - x0)**2 + (y - y0)**2 + (z - z0)**2) / (2 * sigma**2))
 
@@ -444,7 +444,7 @@ class LinearAcoustics:
         self.ndotum = self.mesh.nx * self.u_m + self.mesh.ny * self.v_m + self.mesh.nz * self.w_m
         self.ndotup = self.mesh.nx * self.u_p + self.mesh.ny * self.v_p + self.mesh.nz * self.w_p
         #self.mu = np.maximum(self.c_m, self.c_p)
-        
+
         # compute flux
         self._compute_rh_flux()
         #self._compute_xijun_he_flux()

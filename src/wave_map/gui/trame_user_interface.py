@@ -344,7 +344,7 @@ class TrameGui(TrameApp):
 
                 v3.VDivider()
                 
-                with v3.VCard(flat=True, style="max-height: 40vh; overflow-y: auto;"):
+                with v3.VCard(flat=True, style="max-height: 60vh; overflow-y: auto;"):
                     v3.VCardTitle("Simulation Parameters")
                 
                     with v3.VExpansionPanels(multiple=True):

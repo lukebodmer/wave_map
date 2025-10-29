@@ -316,8 +316,8 @@ class BatchRunnerSetup:
         self.logger.info(f"Generating mesh {mesh_hash} for simulation {simulation_hash}...")
 
         gmsh_generator = GmshMeshGenerator(simulation_parameters, mesh_hash, self.batch_name)
-        #gmsh_generator.generate_ellipsoid_geometry()
-        gmsh_generator.generate_multi_cube_geometry()
+        gmsh_generator.generate_ellipsoid_geometry()
+        #gmsh_generator.generate_multi_cube_geometry()
 
         smallest_radii = gmsh_generator.get_smallest_radii()
 
